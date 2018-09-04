@@ -65,12 +65,7 @@
 // Retrieving the stack trace of an error or wrapper
 //
 // New, Errorf, Wrap, and Wrapf record a stack trace at the point they are
-// invoked. This information can be retrieved with the following interface.
-//
-//     type stackTracer interface {
-//             StackTrace() errors.StackTrace
-//     }
-//
+// invoked. This information can be retrieved with the StackTracer interface that returns a StackTrace.
 // Where errors.StackTrace is defined as
 //
 //     type StackTrace []Frame
@@ -79,14 +74,11 @@
 // the fmt.Formatter interface that can be used for printing information about
 // the stack trace of this error. For example:
 //
-//     if err, ok := err.(stackTracer); ok {
-//             for _, f := range err.StackTrace() {
+//     if stacked := errors.GetStackTracer(err); stacked != nil {
+//             for _, f := range stacked.StackTrace() {
 //                     fmt.Printf("%+s:%d", f)
 //             }
 //     }
-//
-// stackTracer interface is not exported by this package, but is considered a part
-// of stable public API.
 //
 // See the documentation for Frame.Format for more details.
 package errors
@@ -160,10 +152,41 @@ func WithStack(err error) error {
 	if err == nil {
 		return nil
 	}
+
 	return &withStack{
 		err,
 		callers(),
 	}
+}
+
+// AddStack is similar to WithStack.
+// However, it will first check with HasStack to see if a stack trace already exists in the causer chain before creating another one.
+func AddStack(err error) error {
+	if HasStack(err) {
+		return err
+	}
+	return WithStack(err)
+}
+
+// GetStackTracer will return the first StackTracer in the causer chain.
+// This function is used by AddStack to avoid creating redundant stack traces.
+//
+// You can also use the StackTracer interface on the returned error to get the stack trace.
+func GetStackTracer(err error) StackTracer {
+	type causer interface {
+		Cause() error
+	}
+	for err != nil {
+		if stacked, ok := err.(StackTracer); ok {
+			return stacked
+		}
+		cause, ok := err.(causer)
+		if !ok {
+			return nil
+		}
+		err = cause.Cause()
+	}
+	return nil
 }
 
 type withStack struct {
