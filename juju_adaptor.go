@@ -12,7 +12,7 @@ func Trace(err error) error {
 	if err == nil {
 		return nil
 	}
-	if hasStack(err) {
+	if errHasStack(err) {
 		return err
 	}
 	return &withStack{

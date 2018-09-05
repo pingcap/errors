@@ -119,7 +119,7 @@ type withStackAware interface {
 	hasStack() bool
 }
 
-func hasStack(err error) bool {
+func errHasStack(err error) bool {
 	errWithStack, hasStack := err.(withStackAware)
 	if !hasStack {
 		return false
@@ -201,7 +201,7 @@ func Annotate(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := hasStack(err)
+	hasStack := errHasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           message,
@@ -223,7 +223,7 @@ func Annotatef(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := hasStack(err)
+	hasStack := errHasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           fmt.Sprintf(format, args...),
@@ -247,7 +247,7 @@ func WithMessage(err error, message string) error {
 	return &withMessage{
 		cause:         err,
 		msg:           message,
-		causeHasStack: hasStack(err),
+		causeHasStack: errHasStack(err),
 	}
 }
 
