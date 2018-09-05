@@ -1,6 +1,8 @@
 package errors
 
 import (
+	"fmt"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,6 +21,15 @@ func Trace(err error) error {
 		err,
 		callers(),
 	}
+}
+
+// error passed as the parameter is not an annotated error, the result is		 // error passed as the parameter is not an annotated error, the result is
+// simply the result of the Error() method on that error.		 // simply the result of the Error() method on that error.
+func ErrorStack(err error) string {
+	if err == nil {
+		return ""
+	}
+	return fmt.Sprintf("%+v", err)
 }
 
 // Wrap changes the Cause of the error, old error stack also be output.
