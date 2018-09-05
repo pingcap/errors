@@ -119,6 +119,14 @@ type withStackAware interface {
 	hasStack() bool
 }
 
+func hasStack(err error) bool {
+	errWithStack, hasStack := err.(withStackAware)
+	if !hasStack {
+		return false
+	}
+	return errWithStack.hasStack()
+}
+
 // fundamental is an error that has a message and a stack, but no caller.
 type fundamental struct {
 	msg string
@@ -193,10 +201,7 @@ func Annotate(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	errWithStack, hasStack := err.(withStackAware)
-	if hasStack {
-		hasStack = errWithStack.hasStack()
-	}
+	hasStack := hasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           message,
@@ -218,10 +223,7 @@ func Annotatef(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	errWithStack, hasStack := err.(withStackAware)
-	if hasStack {
-		hasStack = errWithStack.hasStack()
-	}
+	hasStack := hasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           fmt.Sprintf(format, args...),
@@ -242,14 +244,10 @@ func WithMessage(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	errWithStack, hasStack := err.(withStackAware)
-	if hasStack {
-		hasStack = errWithStack.hasStack()
-	}
 	return &withMessage{
 		cause:         err,
 		msg:           message,
-		causeHasStack: hasStack,
+		causeHasStack: hasStack(err),
 	}
 }
 
