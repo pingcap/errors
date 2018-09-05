@@ -303,16 +303,21 @@ func (w *withMessage) Format(s fmt.State, verb rune) {
 // be returned. If the error is nil, nil will be returned without further
 // investigation.
 func Cause(err error) error {
+	cause := Unwrap(err)
+	if cause == nil {
+		return err
+	}
+	return Cause(cause)
+}
+
+// Unwrap uses causer to return the next error in the chain or nil.
+// This goes one-level deeper, whereas Cause goes as far as possible
+func Unwrap(err error) error {
 	type causer interface {
 		Cause() error
 	}
-
-	for err != nil {
-		cause, ok := err.(causer)
-		if !ok {
-			break
-		}
-		err = cause.Cause()
+	if unErr, ok := err.(causer); ok {
+		return unErr.Cause()
 	}
-	return err
+	return nil
 }
