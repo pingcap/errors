@@ -2,8 +2,6 @@ package errors
 
 import (
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // ==================== juju adaptor start ========================
@@ -34,7 +32,6 @@ func ErrorStack(err error) string {
 
 // Wrap changes the Cause of the error, old error stack also be output.
 func Wrap(oldErr, newErr error) error {
-	log.Errorf("%+v", oldErr)
 	return Trace(newErr)
 }
 
