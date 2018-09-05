@@ -172,21 +172,16 @@ func AddStack(err error) error {
 // This function is used by AddStack to avoid creating redundant stack traces.
 //
 // You can also use the StackTracer interface on the returned error to get the stack trace.
-func GetStackTracer(err error) StackTracer {
-	type causer interface {
-		Cause() error
-	}
-	for err != nil {
-		if stacked, ok := err.(StackTracer); ok {
-			return stacked
+func GetStackTracer(origErr error) StackTracer {
+	var stacked StackTracer
+	WalkDeep(origErr, func(err error) bool {
+		if stackTracer, ok := err.(StackTracer); ok {
+			stacked = stackTracer
+			return true
 		}
-		cause, ok := err.(causer)
-		if !ok {
-			return nil
-		}
-		err = cause.Cause()
-	}
-	return nil
+		return false
+	})
+	return stacked
 }
 
 type withStack struct {
