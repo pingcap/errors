@@ -305,58 +305,58 @@ func TestFormatWithMessage(t *testing.T) {
 	}
 }
 
-//func TestFormatGeneric(t *testing.T) {
-//	starts := []struct {
-//		err  error
-//		want []string
-//	}{
-//		{New("new-error"), []string{
-//			"new-error",
-//			"github.com/pingcap/errors.TestFormatGeneric\n" +
-//				"\t.+/github.com/pingcap/errors/format_test.go:313"},
-//		}, {Errorf("errorf-error"), []string{
-//			"errorf-error",
-//			"github.com/pingcap/errors.TestFormatGeneric\n" +
-//				"\t.+/github.com/pingcap/errors/format_test.go:317"},
-//		}, {errors.New("errors-new-error"), []string{
-//			"errors-new-error"},
-//		},
-//	}
-//
-//	wrappers := []wrapper{
-//		{
-//			func(err error) error { return WithMessage(err, "with-message") },
-//			[]string{"with-message"},
-//		}, {
-//			func(err error) error { return WithStack(err) },
-//			[]string{
-//				"github.com/pingcap/errors.(func·002|TestFormatGeneric.func2)\n\t" +
-//					".+/github.com/pingcap/errors/format_test.go:331",
-//			},
-//		}, {
-//			func(err error) error { return Annotate(err, "wrap-error") },
-//			[]string{
-//				"wrap-error",
-//				"github.com/pingcap/errors.(func·003|TestFormatGeneric.func3)\n\t" +
-//					".+/github.com/pingcap/errors/format_test.go:337",
-//			},
-//		}, {
-//			func(err error) error { return Annotatef(err, "wrapf-error%d", 1) },
-//			[]string{
-//				"wrapf-error1",
-//				"github.com/pingcap/errors.(func·004|TestFormatGeneric.func4)\n\t" +
-//					".+/github.com/pingcap/errors/format_test.go:346",
-//			},
-//		},
-//	}
-//
-//	for s := range starts {
-//		err := starts[s].err
-//		want := starts[s].want
-//		testFormatCompleteCompare(t, s, err, "%+v", want, false)
-//		testGenericRecursive(t, err, want, wrappers, 3)
-//	}
-//}
+/*func TestFormatGeneric(t *testing.T) {
+	starts := []struct {
+		err  error
+		want []string
+	}{
+		{New("new-error"), []string{
+			"new-error",
+			"github.com/pingcap/errors.TestFormatGeneric\n" +
+				"\t.+/github.com/pingcap/errors/format_test.go:313"},
+		}, {Errorf("errorf-error"), []string{
+			"errorf-error",
+			"github.com/pingcap/errors.TestFormatGeneric\n" +
+				"\t.+/github.com/pingcap/errors/format_test.go:317"},
+		}, {errors.New("errors-new-error"), []string{
+			"errors-new-error"},
+		},
+	}
+
+	wrappers := []wrapper{
+		{
+			func(err error) error { return WithMessage(err, "with-message") },
+			[]string{"with-message"},
+		}, {
+			func(err error) error { return WithStack(err) },
+			[]string{
+				"github.com/pingcap/errors.(func·002|TestFormatGeneric.func2)\n\t" +
+					".+/github.com/pingcap/errors/format_test.go:331",
+			},
+		}, {
+			func(err error) error { return Annotate(err, "wrap-error") },
+			[]string{
+				"wrap-error",
+				"github.com/pingcap/errors.(func·003|TestFormatGeneric.func3)\n\t" +
+					".+/github.com/pingcap/errors/format_test.go:337",
+			},
+		}, {
+			func(err error) error { return Annotatef(err, "wrapf-error%d", 1) },
+			[]string{
+				"wrapf-error1",
+				"github.com/pingcap/errors.(func·004|TestFormatGeneric.func4)\n\t" +
+					".+/github.com/pingcap/errors/format_test.go:346",
+			},
+		},
+	}
+
+	for s := range starts {
+		err := starts[s].err
+		want := starts[s].want
+		testFormatCompleteCompare(t, s, err, "%+v", want, false)
+		testGenericRecursive(t, err, want, wrappers, 3)
+	}
+}*/
 
 func testFormatRegexp(t *testing.T, n int, arg interface{}, format, want string) {
 	got := fmt.Sprintf(format, arg)
