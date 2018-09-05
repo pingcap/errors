@@ -316,3 +316,16 @@ func Unwrap(err error) error {
 	}
 	return nil
 }
+
+// Find an error in the chain that matches a test function
+func Find(origErr error, test func(error) bool) error {
+	var foundErr error
+	WalkDeep(origErr, func(err error) bool {
+		if test(err) {
+			foundErr = err
+			return true
+		}
+		return false
+	})
+	return foundErr
+}

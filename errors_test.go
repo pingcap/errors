@@ -279,3 +279,36 @@ func TestErrorEquality(t *testing.T) {
 		}
 	}
 }
+
+func TestFind(t *testing.T) {
+	eNew := errors.New("error")
+	wrapped := Annotate(nilError{}, "nil")
+	tests := []struct {
+		err    error
+		finder func(error) bool
+		found  error
+	}{
+		{io.EOF, func(_ error) bool { return true }, io.EOF},
+		{io.EOF, func(_ error) bool { return false }, nil},
+		{io.EOF, func(err error) bool { return err == io.EOF }, io.EOF},
+		{io.EOF, func(err error) bool { return err != io.EOF }, nil},
+
+		{eNew, func(err error) bool { return true }, eNew},
+		{eNew, func(err error) bool { return false }, nil},
+
+		{nilError{}, func(err error) bool { return true }, nilError{}},
+		{nilError{}, func(err error) bool { return false }, nil},
+		{nilError{}, func(err error) bool { _, ok := err.(nilError); return ok }, nilError{}},
+
+		{wrapped, func(err error) bool { return true }, wrapped},
+		{wrapped, func(err error) bool { return false }, nil},
+		{wrapped, func(err error) bool { _, ok := err.(nilError); return ok }, nilError{}},
+	}
+
+	for _, tt := range tests {
+		got := Find(tt.err, tt.finder)
+		if got != tt.found {
+			t.Errorf("WithMessage(%v): got: %q, want %q", tt.err, got, tt.found)
+		}
+	}
+}
