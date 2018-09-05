@@ -194,10 +194,12 @@ func (w *withStack) hasStack() bool {
 	return true
 }
 
-// Annotate returns an error annotating err with a stack trace
+// Wrap returns an error annotating err with a stack trace
 // at the point Annotate is called, and the supplied message.
 // If err is nil, Annotate returns nil.
-func Annotate(err error, message string) error {
+//
+// Deprecated: use Annotate instead
+func Wrap(err error, message string) error {
 	if err == nil {
 		return nil
 	}
@@ -207,19 +209,18 @@ func Annotate(err error, message string) error {
 		msg:           message,
 		causeHasStack: hasStack,
 	}
-	if hasStack {
-		return err
-	}
 	return &withStack{
 		err,
 		callers(),
 	}
 }
 
-// Annotatef returns an error annotating err with a stack trace
+// Wrapf returns an error annotating err with a stack trace
 // at the point Annotatef is call, and the format specifier.
 // If err is nil, Annotatef returns nil.
-func Annotatef(err error, format string, args ...interface{}) error {
+//
+// Deprecated: use Annotatef instead
+func Wrapf(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
@@ -228,9 +229,6 @@ func Annotatef(err error, format string, args ...interface{}) error {
 		cause:         err,
 		msg:           fmt.Sprintf(format, args...),
 		causeHasStack: hasStack,
-	}
-	if hasStack {
-		return err
 	}
 	return &withStack{
 		err,
