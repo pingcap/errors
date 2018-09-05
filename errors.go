@@ -115,16 +115,19 @@ func Errorf(format string, args ...interface{}) error {
 	}
 }
 
-type withStackAware interface {
+// StackTraceAware is an optimization to avoid repetitive traversals of an error chain.
+// HasStack checks for this marker first.
+// Annotate/Wrap and Annotatef/Wrapf will produce this marker.
+type StackTraceAware interface {
 	hasStack() bool
 }
 
-func errHasStack(err error) bool {
-	errWithStack, hasStack := err.(withStackAware)
-	if !hasStack {
-		return false
+// HasStack tells whether a StackTracer exists in the error chain
+func HasStack(err error) bool {
+	if errWithStack, ok := err.(StackTraceAware); ok {
+		return errWithStack.hasStack()
 	}
-	return errWithStack.hasStack()
+	return GetStackTracer(err) != nil
 }
 
 // fundamental is an error that has a message and a stack, but no caller.
@@ -149,10 +152,6 @@ func (f *fundamental) Format(s fmt.State, verb rune) {
 	case 'q':
 		fmt.Fprintf(s, "%q", f.msg)
 	}
-}
-
-func (f *fundamental) hasStack() bool {
-	return true
 }
 
 // WithStack annotates err with a stack trace at the point WithStack was called.
@@ -190,10 +189,6 @@ func (w *withStack) Format(s fmt.State, verb rune) {
 	}
 }
 
-func (w *withStack) hasStack() bool {
-	return true
-}
-
 // Wrap returns an error annotating err with a stack trace
 // at the point Annotate is called, and the supplied message.
 // If err is nil, Annotate returns nil.
@@ -203,7 +198,7 @@ func Wrap(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := errHasStack(err)
+	hasStack := HasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           message,
@@ -224,7 +219,7 @@ func Wrapf(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := errHasStack(err)
+	hasStack := HasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           fmt.Sprintf(format, args...),
@@ -245,7 +240,7 @@ func WithMessage(err error, message string) error {
 	return &withMessage{
 		cause:         err,
 		msg:           message,
-		causeHasStack: errHasStack(err),
+		causeHasStack: HasStack(err),
 	}
 }
 

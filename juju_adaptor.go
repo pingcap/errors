@@ -16,7 +16,7 @@ func Annotate(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := errHasStack(err)
+	hasStack := HasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           message,
@@ -35,7 +35,7 @@ func Annotatef(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := errHasStack(err)
+	hasStack := HasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           fmt.Sprintf(format, args...),
