@@ -187,13 +187,6 @@ func TestStackTrace(t *testing.T) {
 		},
 	}}
 	for i, tt := range tests {
-		_, ok := tt.err.(interface {
-			hasStack() bool
-		})
-		if !ok {
-			t.Errorf("expected %#v to implement StackTrace() StackTrace %v", tt.err, tt.want)
-			continue
-		}
 		ste, ok := tt.err.(interface {
 			StackTrace() StackTrace
 		})
@@ -263,19 +256,19 @@ func TestStackTraceFormat(t *testing.T) {
 	}, {
 		stackTrace()[:2],
 		"%v",
-		`[stack_test.go:217 stack_test.go:276]`,
+		`[stack_test.go:207 stack_test.go:254]`,
 	}, {
 		stackTrace()[:2],
 		"%+v",
 		"\n" +
 			"github.com/pkg/errors.stackTrace\n" +
-			"\t.+/github.com/pkg/errors/stack_test.go:217\n" +
+			"\t.+/github.com/pkg/errors/stack_test.go:210\n" +
 			"github.com/pkg/errors.TestStackTraceFormat\n" +
-			"\t.+/github.com/pkg/errors/stack_test.go:268",
+			"\t.+/github.com/pkg/errors/stack_test.go:261",
 	}, {
 		stackTrace()[:2],
 		"%#v",
-		`\[\]errors.Frame{stack_test.go:217, stack_test.go:276}`,
+		`\[\]errors.Frame{stack_test.go:210, stack_test.go:269}`,
 	}}
 
 	for i, tt := range tests {
