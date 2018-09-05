@@ -115,6 +115,10 @@ func Errorf(format string, args ...interface{}) error {
 	}
 }
 
+type withStackAware interface {
+	hasStack() bool
+}
+
 // fundamental is an error that has a message and a stack, but no caller.
 type fundamental struct {
 	msg string
@@ -137,6 +141,10 @@ func (f *fundamental) Format(s fmt.State, verb rune) {
 	case 'q':
 		fmt.Fprintf(s, "%q", f.msg)
 	}
+}
+
+func (f *fundamental) hasStack() bool {
+	return true
 }
 
 // WithStack annotates err with a stack trace at the point WithStack was called.
@@ -174,16 +182,28 @@ func (w *withStack) Format(s fmt.State, verb rune) {
 	}
 }
 
-// Wrap returns an error annotating err with a stack trace
-// at the point Wrap is called, and the supplied message.
-// If err is nil, Wrap returns nil.
-func Wrap(err error, message string) error {
+func (w *withStack) hasStack() bool {
+	return true
+}
+
+// Annotate returns an error annotating err with a stack trace
+// at the point Annotate is called, and the supplied message.
+// If err is nil, Annotate returns nil.
+func Annotate(err error, message string) error {
 	if err == nil {
 		return nil
 	}
+	errWithStack, hasStack := err.(withStackAware)
+	if hasStack {
+		hasStack = errWithStack.hasStack()
+	}
 	err = &withMessage{
-		cause: err,
-		msg:   message,
+		cause:         err,
+		msg:           message,
+		causeHasStack: hasStack,
+	}
+	if hasStack {
+		return err
 	}
 	return &withStack{
 		err,
@@ -191,16 +211,24 @@ func Wrap(err error, message string) error {
 	}
 }
 
-// Wrapf returns an error annotating err with a stack trace
-// at the point Wrapf is call, and the format specifier.
-// If err is nil, Wrapf returns nil.
-func Wrapf(err error, format string, args ...interface{}) error {
+// Annotatef returns an error annotating err with a stack trace
+// at the point Annotatef is call, and the format specifier.
+// If err is nil, Annotatef returns nil.
+func Annotatef(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
+	errWithStack, hasStack := err.(withStackAware)
+	if hasStack {
+		hasStack = errWithStack.hasStack()
+	}
 	err = &withMessage{
-		cause: err,
-		msg:   fmt.Sprintf(format, args...),
+		cause:         err,
+		msg:           fmt.Sprintf(format, args...),
+		causeHasStack: hasStack,
+	}
+	if hasStack {
+		return err
 	}
 	return &withStack{
 		err,
@@ -214,19 +242,26 @@ func WithMessage(err error, message string) error {
 	if err == nil {
 		return nil
 	}
+	errWithStack, hasStack := err.(withStackAware)
+	if hasStack {
+		hasStack = errWithStack.hasStack()
+	}
 	return &withMessage{
-		cause: err,
-		msg:   message,
+		cause:         err,
+		msg:           message,
+		causeHasStack: hasStack,
 	}
 }
 
 type withMessage struct {
-	cause error
-	msg   string
+	cause         error
+	msg           string
+	causeHasStack bool
 }
 
-func (w *withMessage) Error() string { return w.msg + ": " + w.cause.Error() }
-func (w *withMessage) Cause() error  { return w.cause }
+func (w *withMessage) Error() string  { return w.msg + ": " + w.cause.Error() }
+func (w *withMessage) Cause() error   { return w.cause }
+func (w *withMessage) hasStack() bool { return w.causeHasStack }
 
 func (w *withMessage) Format(s fmt.State, verb rune) {
 	switch verb {
