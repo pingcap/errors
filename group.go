@@ -8,26 +8,26 @@ type ErrorGroup interface {
 
 // WalkDeep does a depth-first traversal of all errors.
 // Any ErrorGroup is traversed (after going deep).
-// The visitor function can return false to end the traversal early
-// In that case, WalkDeep will return false, otherwise true
-func WalkDeep(err error, visitor func(err error) bool) bool {
+// The visitor function can return true to end the traversal early
+// In that case, WalkDeep will return true, otherwise false.
+func WalkDeep(err error, visitor func(err error) bool) (done bool) {
 	// Go deep
 	unErr := err
 	for unErr != nil {
-		if more := visitor(unErr); more == true {
+		if done := visitor(unErr); done == true {
 			return true
 		}
 		unErr = Unwrap(unErr)
 	}
 
 	// Go wide
-	if hasGroup, ok := err.(ErrorGroup); ok {
-		for _, err := range hasGroup.Errors() {
-			if more := WalkDeep(err, visitor); more == true {
+	if group, ok := err.(ErrorGroup); ok {
+		for _, err := range group.Errors() {
+			if done := WalkDeep(err, visitor); done == true {
 				return true
 			}
 		}
 	}
 
-	return true
+	return false
 }

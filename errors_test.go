@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -310,5 +311,61 @@ func TestFind(t *testing.T) {
 		if got != tt.found {
 			t.Errorf("WithMessage(%v): got: %q, want %q", tt.err, got, tt.found)
 		}
+	}
+}
+
+type errWalkTest struct {
+	cause error
+	sub   []error
+	v     int
+}
+
+func (e *errWalkTest) Error() string {
+	return strconv.Itoa(e.v)
+}
+
+func (e *errWalkTest) Cause() error {
+	return e.cause
+}
+
+func (e *errWalkTest) Errors() []error {
+	return e.sub
+}
+
+func testFind(err error, v int) bool {
+	return WalkDeep(err, func(err error) bool {
+		e := err.(*errWalkTest)
+		return e.v == v
+	})
+}
+
+func TestWalkDeep(t *testing.T) {
+	err := &errWalkTest{
+		sub: []error{
+			&errWalkTest{
+				v:     10,
+				cause: &errWalkTest{v: 11},
+			},
+			&errWalkTest{
+				v:     20,
+				cause: &errWalkTest{v: 21, cause: &errWalkTest{v: 22}},
+			},
+			&errWalkTest{
+				v:     30,
+				cause: &errWalkTest{v: 31},
+			},
+		},
+	}
+
+	if !testFind(err, 11) {
+		t.Errorf("not found in first cause chain")
+	}
+
+	if !testFind(err, 22) {
+		t.Errorf("not found in siblings")
+	}
+
+	if testFind(err, 32) {
+		t.Errorf("found not exists")
 	}
 }
