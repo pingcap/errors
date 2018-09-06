@@ -14,7 +14,7 @@ func WalkDeep(err error, visitor func(err error) bool) (done bool) {
 	// Go deep
 	unErr := err
 	for unErr != nil {
-		if done := visitor(unErr); done == true {
+		if done := visitor(unErr); done {
 			return true
 		}
 		unErr = Unwrap(unErr)
@@ -23,7 +23,7 @@ func WalkDeep(err error, visitor func(err error) bool) (done bool) {
 	// Go wide
 	if group, ok := err.(ErrorGroup); ok {
 		for _, err := range group.Errors() {
-			if done := WalkDeep(err, visitor); done == true {
+			if done := WalkDeep(err, visitor); done {
 				return true
 			}
 		}
