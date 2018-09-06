@@ -96,6 +96,12 @@ func TestCause(t *testing.T) {
 	}, {
 		WithStack(io.EOF),
 		io.EOF,
+	}, {
+		AddStack(nil),
+		nil,
+	}, {
+		AddStack(io.EOF),
+		io.EOF,
 	}}
 
 	for i, tt := range tests {
@@ -154,6 +160,10 @@ func TestWithStackNil(t *testing.T) {
 	if got != nil {
 		t.Errorf("WithStack(nil): got %#v, expected nil", got)
 	}
+	got = AddStack(nil)
+	if got != nil {
+		t.Errorf("AddStack(nil): got %#v, expected nil", got)
+	}
 }
 
 func TestWithStack(t *testing.T) {
@@ -170,6 +180,50 @@ func TestWithStack(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("WithStack(%v): got: %v, want %v", tt.err, got, tt.want)
 		}
+	}
+}
+
+func TestAddStack(t *testing.T) {
+	tests := []struct {
+		err  error
+		want string
+	}{
+		{io.EOF, "EOF"},
+		{AddStack(io.EOF), "EOF"},
+	}
+
+	for _, tt := range tests {
+		got := AddStack(tt.err).Error()
+		if got != tt.want {
+			t.Errorf("AddStack(%v): got: %v, want %v", tt.err, got, tt.want)
+		}
+	}
+}
+
+func TestGetStackTracer(t *testing.T) {
+	orig := io.EOF
+	if GetStackTracer(orig) != nil {
+		t.Errorf("GetStackTracer: got: %v, want %v", GetStackTracer(orig), nil)
+	}
+	stacked := AddStack(orig)
+	if GetStackTracer(stacked).(error) != stacked {
+		t.Errorf("GetStackTracer(stacked): got: %v, want %v", GetStackTracer(stacked), stacked)
+	}
+	final := AddStack(stacked)
+	if GetStackTracer(final).(error) != stacked {
+		t.Errorf("GetStackTracer(final): got: %v, want %v", GetStackTracer(final), stacked)
+	}
+}
+
+func TestAddStackDedup(t *testing.T) {
+	stacked := WithStack(io.EOF)
+	err := AddStack(stacked)
+	if err != stacked {
+		t.Errorf("AddStack: got: %+v, want %+v", err, stacked)
+	}
+	err = WithStack(stacked)
+	if err == stacked {
+		t.Errorf("WithStack: got: %v, don't want %v", err, stacked)
 	}
 }
 
@@ -215,11 +269,46 @@ func TestErrorEquality(t *testing.T) {
 		WithMessage(io.EOF, "whoops"),
 		WithStack(io.EOF),
 		WithStack(nil),
+		AddStack(io.EOF),
+		AddStack(nil),
 	}
 
 	for i := range vals {
 		for j := range vals {
 			_ = vals[i] == vals[j] // mustn't panic
+		}
+	}
+}
+
+func TestFind(t *testing.T) {
+	eNew := errors.New("error")
+	wrapped := Annotate(nilError{}, "nil")
+	tests := []struct {
+		err    error
+		finder func(error) bool
+		found  error
+	}{
+		{io.EOF, func(_ error) bool { return true }, io.EOF},
+		{io.EOF, func(_ error) bool { return false }, nil},
+		{io.EOF, func(err error) bool { return err == io.EOF }, io.EOF},
+		{io.EOF, func(err error) bool { return err != io.EOF }, nil},
+
+		{eNew, func(err error) bool { return true }, eNew},
+		{eNew, func(err error) bool { return false }, nil},
+
+		{nilError{}, func(err error) bool { return true }, nilError{}},
+		{nilError{}, func(err error) bool { return false }, nil},
+		{nilError{}, func(err error) bool { _, ok := err.(nilError); return ok }, nilError{}},
+
+		{wrapped, func(err error) bool { return true }, wrapped},
+		{wrapped, func(err error) bool { return false }, nil},
+		{wrapped, func(err error) bool { _, ok := err.(nilError); return ok }, nilError{}},
+	}
+
+	for _, tt := range tests {
+		got := Find(tt.err, tt.finder)
+		if got != tt.found {
+			t.Errorf("WithMessage(%v): got: %q, want %q", tt.err, got, tt.found)
 		}
 	}
 }

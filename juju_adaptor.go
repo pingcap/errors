@@ -9,10 +9,20 @@ import (
 // Trace annotates err with a stack trace at the point WithStack was called.
 // If err is nil or already contain stack trace return directly.
 func Trace(err error) error {
+	return AddStack(err)
+}
+
+func Annotate(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	if errHasStack(err) {
+	hasStack := HasStack(err)
+	err = &withMessage{
+		cause:         err,
+		msg:           message,
+		causeHasStack: hasStack,
+	}
+	if hasStack {
 		return err
 	}
 	return &withStack{
@@ -21,18 +31,31 @@ func Trace(err error) error {
 	}
 }
 
-// error passed as the parameter is not an annotated error, the result is		 // error passed as the parameter is not an annotated error, the result is
-// simply the result of the Error() method on that error.		 // simply the result of the Error() method on that error.
+func Annotatef(err error, format string, args ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+	hasStack := HasStack(err)
+	err = &withMessage{
+		cause:         err,
+		msg:           fmt.Sprintf(format, args...),
+		causeHasStack: hasStack,
+	}
+	if hasStack {
+		return err
+	}
+	return &withStack{
+		err,
+		callers(),
+	}
+}
+
+// ErrorStack will format a stack trace if it is available, otherwise it will be Error()
 func ErrorStack(err error) string {
 	if err == nil {
 		return ""
 	}
 	return fmt.Sprintf("%+v", err)
-}
-
-// Wrap changes the Cause of the error, old error stack also be output.
-func Wrap(oldErr, newErr error) error {
-	return Trace(newErr)
 }
 
 // NotFoundf represents an error with not found message.

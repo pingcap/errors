@@ -65,12 +65,7 @@
 // Retrieving the stack trace of an error or wrapper
 //
 // New, Errorf, Wrap, and Wrapf record a stack trace at the point they are
-// invoked. This information can be retrieved with the following interface.
-//
-//     type stackTracer interface {
-//             StackTrace() errors.StackTrace
-//     }
-//
+// invoked. This information can be retrieved with the StackTracer interface that returns a StackTrace.
 // Where errors.StackTrace is defined as
 //
 //     type StackTrace []Frame
@@ -79,14 +74,11 @@
 // the fmt.Formatter interface that can be used for printing information about
 // the stack trace of this error. For example:
 //
-//     if err, ok := err.(stackTracer); ok {
-//             for _, f := range err.StackTrace() {
+//     if stacked := errors.GetStackTracer(err); stacked != nil {
+//             for _, f := range stacked.StackTrace() {
 //                     fmt.Printf("%+s:%d", f)
 //             }
 //     }
-//
-// stackTracer interface is not exported by this package, but is considered a part
-// of stable public API.
 //
 // See the documentation for Frame.Format for more details.
 package errors
@@ -115,16 +107,19 @@ func Errorf(format string, args ...interface{}) error {
 	}
 }
 
-type withStackAware interface {
+// StackTraceAware is an optimization to avoid repetitive traversals of an error chain.
+// HasStack checks for this marker first.
+// Annotate/Wrap and Annotatef/Wrapf will produce this marker.
+type StackTraceAware interface {
 	hasStack() bool
 }
 
-func errHasStack(err error) bool {
-	errWithStack, hasStack := err.(withStackAware)
-	if !hasStack {
-		return false
+// HasStack tells whether a StackTracer exists in the error chain
+func HasStack(err error) bool {
+	if errWithStack, ok := err.(StackTraceAware); ok {
+		return errWithStack.hasStack()
 	}
-	return errWithStack.hasStack()
+	return GetStackTracer(err) != nil
 }
 
 // fundamental is an error that has a message and a stack, but no caller.
@@ -151,20 +146,42 @@ func (f *fundamental) Format(s fmt.State, verb rune) {
 	}
 }
 
-func (f *fundamental) hasStack() bool {
-	return true
-}
-
 // WithStack annotates err with a stack trace at the point WithStack was called.
 // If err is nil, WithStack returns nil.
 func WithStack(err error) error {
 	if err == nil {
 		return nil
 	}
+
 	return &withStack{
 		err,
 		callers(),
 	}
+}
+
+// AddStack is similar to WithStack.
+// However, it will first check with HasStack to see if a stack trace already exists in the causer chain before creating another one.
+func AddStack(err error) error {
+	if HasStack(err) {
+		return err
+	}
+	return WithStack(err)
+}
+
+// GetStackTracer will return the first StackTracer in the causer chain.
+// This function is used by AddStack to avoid creating redundant stack traces.
+//
+// You can also use the StackTracer interface on the returned error to get the stack trace.
+func GetStackTracer(origErr error) StackTracer {
+	var stacked StackTracer
+	WalkDeep(origErr, func(err error) bool {
+		if stackTracer, ok := err.(StackTracer); ok {
+			stacked = stackTracer
+			return true
+		}
+		return false
+	})
+	return stacked
 }
 
 type withStack struct {
@@ -190,25 +207,20 @@ func (w *withStack) Format(s fmt.State, verb rune) {
 	}
 }
 
-func (w *withStack) hasStack() bool {
-	return true
-}
-
-// Annotate returns an error annotating err with a stack trace
+// Wrap returns an error annotating err with a stack trace
 // at the point Annotate is called, and the supplied message.
 // If err is nil, Annotate returns nil.
-func Annotate(err error, message string) error {
+//
+// Deprecated: use Annotate instead
+func Wrap(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := errHasStack(err)
+	hasStack := HasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           message,
 		causeHasStack: hasStack,
-	}
-	if hasStack {
-		return err
 	}
 	return &withStack{
 		err,
@@ -216,21 +228,20 @@ func Annotate(err error, message string) error {
 	}
 }
 
-// Annotatef returns an error annotating err with a stack trace
+// Wrapf returns an error annotating err with a stack trace
 // at the point Annotatef is call, and the format specifier.
 // If err is nil, Annotatef returns nil.
-func Annotatef(err error, format string, args ...interface{}) error {
+//
+// Deprecated: use Annotatef instead
+func Wrapf(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	hasStack := errHasStack(err)
+	hasStack := HasStack(err)
 	err = &withMessage{
 		cause:         err,
 		msg:           fmt.Sprintf(format, args...),
 		causeHasStack: hasStack,
-	}
-	if hasStack {
-		return err
 	}
 	return &withStack{
 		err,
@@ -247,7 +258,7 @@ func WithMessage(err error, message string) error {
 	return &withMessage{
 		cause:         err,
 		msg:           message,
-		causeHasStack: errHasStack(err),
+		causeHasStack: HasStack(err),
 	}
 }
 
@@ -287,16 +298,34 @@ func (w *withMessage) Format(s fmt.State, verb rune) {
 // be returned. If the error is nil, nil will be returned without further
 // investigation.
 func Cause(err error) error {
+	cause := Unwrap(err)
+	if cause == nil {
+		return err
+	}
+	return Cause(cause)
+}
+
+// Unwrap uses causer to return the next error in the chain or nil.
+// This goes one-level deeper, whereas Cause goes as far as possible
+func Unwrap(err error) error {
 	type causer interface {
 		Cause() error
 	}
-
-	for err != nil {
-		cause, ok := err.(causer)
-		if !ok {
-			break
-		}
-		err = cause.Cause()
+	if unErr, ok := err.(causer); ok {
+		return unErr.Cause()
 	}
-	return err
+	return nil
+}
+
+// Find an error in the chain that matches a test function
+func Find(origErr error, test func(error) bool) error {
+	var foundErr error
+	WalkDeep(origErr, func(err error) bool {
+		if test(err) {
+			foundErr = err
+			return true
+		}
+		return false
+	})
+	return foundErr
 }
