@@ -64,9 +64,9 @@
 //
 // Retrieving the stack trace of an error or wrapper
 //
-// New, Errorf, Wrap, and Wrapf record a stack trace at the point they are
-// invoked. This information can be retrieved with the StackTracer interface that returns a StackTrace.
-// Where errors.StackTrace is defined as
+// New, Errorf, Wrap, and Wrapf record a stack trace at the point they are invoked.
+// This information can be retrieved with the StackTracer interface that returns
+// a StackTrace. Where errors.StackTrace is defined as
 //
 //     type StackTrace []Frame
 //
@@ -111,13 +111,13 @@ func Errorf(format string, args ...interface{}) error {
 // HasStack checks for this marker first.
 // Annotate/Wrap and Annotatef/Wrapf will produce this marker.
 type StackTraceAware interface {
-	hasStack() bool
+	HasStack() bool
 }
 
 // HasStack tells whether a StackTracer exists in the error chain
 func HasStack(err error) bool {
 	if errWithStack, ok := err.(StackTraceAware); ok {
-		return errWithStack.hasStack()
+		return errWithStack.HasStack()
 	}
 	return GetStackTracer(err) != nil
 }
@@ -270,7 +270,7 @@ type withMessage struct {
 
 func (w *withMessage) Error() string  { return w.msg + ": " + w.cause.Error() }
 func (w *withMessage) Cause() error   { return w.cause }
-func (w *withMessage) hasStack() bool { return w.causeHasStack }
+func (w *withMessage) HasStack() bool { return w.causeHasStack }
 
 func (w *withMessage) Format(s fmt.State, verb rune) {
 	switch verb {
