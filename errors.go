@@ -13,25 +13,24 @@
 //
 // Adding context to an error
 //
-// The errors.Wrap function returns a new error that adds context to the
-// original error by recording a stack trace at the point Wrap is called,
-// together with the supplied message. For example
+// The errors.Annotate function returns a new error that adds context to the
+// original error by recording a stack trace at the point Annotate is called,
+// and the supplied message. For example
 //
 //     _, err := ioutil.ReadAll(r)
 //     if err != nil {
-//             return errors.Wrap(err, "read failed")
+//             return errors.Annotate(err, "read failed")
 //     }
 //
-// If additional control is required, the errors.WithStack and
-// errors.WithMessage functions destructure errors.Wrap into its component
-// operations: annotating an error with a stack trace and with a message,
-// respectively.
+// If additional control is required the errors.AddStack and errors.WithMessage
+// functions destructure errors.Annotate into its component operations of annotating
+// an error with a stack trace and an a message, respectively.
 //
 // Retrieving the cause of an error
 //
-// Using errors.Wrap constructs a stack of errors, adding context to the
+// Using errors.Annotate constructs a stack of errors, adding context to the
 // preceding error. Depending on the nature of the error it may be necessary
-// to reverse the operation of errors.Wrap to retrieve the original error
+// to reverse the operation of errors.Annotate to retrieve the original error
 // for inspection. Any error value which implements this interface
 //
 //     type causer interface {
@@ -39,7 +38,7 @@
 //     }
 //
 // can be inspected by errors.Cause. errors.Cause will recursively retrieve
-// the topmost error that does not implement causer, which is assumed to be
+// the topmost error which does not implement causer, which is assumed to be
 // the original cause. For example:
 //
 //     switch err := errors.Cause(err).(type) {
@@ -49,13 +48,14 @@
 //             // unknown error
 //     }
 //
-// Although the causer interface is not exported by this package, it is
-// considered a part of its stable public interface.
+// causer interface is not exported by this package, but is considered a part
+// of stable public API.
+// errors.Unwrap is also available: this will retrieve the next error in the chain.
 //
 // Formatted printing of errors
 //
 // All error values returned from this package implement fmt.Formatter and can
-// be formatted by the fmt package. The following verbs are supported:
+// be formatted by the fmt package. The following verbs are supported
 //
 //     %s    print the error. If the error has a Cause it will be
 //           printed recursively.
@@ -65,14 +65,9 @@
 //
 // Retrieving the stack trace of an error or wrapper
 //
-// New, Errorf, Wrap, and Wrapf record a stack trace at the point they are
-// invoked. This information can be retrieved with the following interface:
-//
-//     type stackTracer interface {
-//             StackTrace() errors.StackTrace
-//     }
-//
-// The returned errors.StackTrace type is defined as
+// New, Errorf, Annotate, and Annotatef record a stack trace at the point they are invoked.
+// This information can be retrieved with the StackTracer interface that returns
+// a StackTrace. Where errors.StackTrace is defined as
 //
 //     type StackTrace []Frame
 //
@@ -80,16 +75,15 @@
 // the fmt.Formatter interface that can be used for printing information about
 // the stack trace of this error. For example:
 //
-//     if err, ok := err.(stackTracer); ok {
-//             for _, f := range err.StackTrace() {
-//                     fmt.Printf("%+s:%d\n", f, f)
+//     if stacked := errors.GetStackTracer(err); stacked != nil {
+//             for _, f := range stacked.StackTrace() {
+//                     fmt.Printf("%+s:%d", f)
 //             }
 //     }
 //
-// Although the stackTracer interface is not exported by this package, it is
-// considered a part of its stable public interface.
-//
 // See the documentation for Frame.Format for more details.
+//
+// errors.Find can be used to search for an error in the error chain.
 package errors
 
 import (
@@ -157,6 +151,8 @@ func (f *fundamental) Format(s fmt.State, verb rune) {
 
 // WithStack annotates err with a stack trace at the point WithStack was called.
 // If err is nil, WithStack returns nil.
+//
+// Deprecated: use AddStack
 func WithStack(err error) error {
 	if err == nil {
 		return nil
@@ -338,7 +334,8 @@ func Unwrap(err error) error {
 	return nil
 }
 
-// Find an error in the chain that matches a test function
+// Find an error in the chain that matches a test function.
+// returns nil if no error is found.
 func Find(origErr error, test func(error) bool) error {
 	var foundErr error
 	WalkDeep(origErr, func(err error) bool {
