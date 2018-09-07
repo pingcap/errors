@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+// StackTracer retrieves the StackTrace
+// Generally you would want to use the GetStackTracer function to do that.
+type StackTracer interface {
+	StackTrace() StackTrace
+}
+
 // Frame represents a program counter inside a stack frame.
 // For historical reasons if Frame is interpreted as a uintptr
 // its value represents the program counter + 1.

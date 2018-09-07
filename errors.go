@@ -116,6 +116,21 @@ func Errorf(format string, args ...interface{}) error {
 	}
 }
 
+// StackTraceAware is an optimization to avoid repetitive traversals of an error chain.
+// HasStack checks for this marker first.
+// Annotate/Wrap and Annotatef/Wrapf will produce this marker.
+type StackTraceAware interface {
+	HasStack() bool
+}
+
+// HasStack tells whether a StackTracer exists in the error chain
+func HasStack(err error) bool {
+	if errWithStack, ok := err.(StackTraceAware); ok {
+		return errWithStack.HasStack()
+	}
+	return GetStackTracer(err) != nil
+}
+
 // fundamental is an error that has a message and a stack, but no caller.
 type fundamental struct {
 	msg string
@@ -152,6 +167,31 @@ func WithStack(err error) error {
 	}
 }
 
+// AddStack is similar to WithStack.
+// However, it will first check with HasStack to see if a stack trace already exists in the causer chain before creating another one.
+func AddStack(err error) error {
+	if HasStack(err) {
+		return err
+	}
+	return WithStack(err)
+}
+
+// GetStackTracer will return the first StackTracer in the causer chain.
+// This function is used by AddStack to avoid creating redundant stack traces.
+//
+// You can also use the StackTracer interface on the returned error to get the stack trace.
+func GetStackTracer(origErr error) StackTracer {
+	var stacked StackTracer
+	WalkDeep(origErr, func(err error) bool {
+		if stackTracer, ok := err.(StackTracer); ok {
+			stacked = stackTracer
+			return true
+		}
+		return false
+	})
+	return stacked
+}
+
 type withStack struct {
 	error
 	*stack
@@ -176,15 +216,19 @@ func (w *withStack) Format(s fmt.State, verb rune) {
 }
 
 // Wrap returns an error annotating err with a stack trace
-// at the point Wrap is called, and the supplied message.
-// If err is nil, Wrap returns nil.
+// at the point Annotate is called, and the supplied message.
+// If err is nil, Annotate returns nil.
+//
+// Deprecated: use Annotate instead
 func Wrap(err error, message string) error {
 	if err == nil {
 		return nil
 	}
+	hasStack := HasStack(err)
 	err = &withMessage{
-		cause: err,
-		msg:   message,
+		cause:         err,
+		msg:           message,
+		causeHasStack: hasStack,
 	}
 	return &withStack{
 		err,
@@ -193,15 +237,19 @@ func Wrap(err error, message string) error {
 }
 
 // Wrapf returns an error annotating err with a stack trace
-// at the point Wrapf is called, and the format specifier.
-// If err is nil, Wrapf returns nil.
+// at the point Annotatef is call, and the format specifier.
+// If err is nil, Annotatef returns nil.
+//
+// Deprecated: use Annotatef instead
 func Wrapf(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
+	hasStack := HasStack(err)
 	err = &withMessage{
-		cause: err,
-		msg:   fmt.Sprintf(format, args...),
+		cause:         err,
+		msg:           fmt.Sprintf(format, args...),
+		causeHasStack: hasStack,
 	}
 	return &withStack{
 		err,
@@ -216,8 +264,9 @@ func WithMessage(err error, message string) error {
 		return nil
 	}
 	return &withMessage{
-		cause: err,
-		msg:   message,
+		cause:         err,
+		msg:           message,
+		causeHasStack: HasStack(err),
 	}
 }
 
@@ -230,16 +279,19 @@ func WithMessagef(err error, format string, args ...interface{}) error {
 	return &withMessage{
 		cause: err,
 		msg:   fmt.Sprintf(format, args...),
+		causeHasStack: HasStack(err),
 	}
 }
 
 type withMessage struct {
-	cause error
-	msg   string
+	cause         error
+	msg           string
+	causeHasStack bool
 }
 
-func (w *withMessage) Error() string { return w.msg + ": " + w.cause.Error() }
-func (w *withMessage) Cause() error  { return w.cause }
+func (w *withMessage) Error() string  { return w.msg + ": " + w.cause.Error() }
+func (w *withMessage) Cause() error   { return w.cause }
+func (w *withMessage) HasStack() bool { return w.causeHasStack }
 
 func (w *withMessage) Format(s fmt.State, verb rune) {
 	switch verb {
@@ -267,16 +319,34 @@ func (w *withMessage) Format(s fmt.State, verb rune) {
 // be returned. If the error is nil, nil will be returned without further
 // investigation.
 func Cause(err error) error {
+	cause := Unwrap(err)
+	if cause == nil {
+		return err
+	}
+	return Cause(cause)
+}
+
+// Unwrap uses causer to return the next error in the chain or nil.
+// This goes one-level deeper, whereas Cause goes as far as possible
+func Unwrap(err error) error {
 	type causer interface {
 		Cause() error
 	}
-
-	for err != nil {
-		cause, ok := err.(causer)
-		if !ok {
-			break
-		}
-		err = cause.Cause()
+	if unErr, ok := err.(causer); ok {
+		return unErr.Cause()
 	}
-	return err
+	return nil
+}
+
+// Find an error in the chain that matches a test function
+func Find(origErr error, test func(error) bool) error {
+	var foundErr error
+	WalkDeep(origErr, func(err error) bool {
+		if test(err) {
+			foundErr = err
+			return true
+		}
+		return false
+	})
+	return foundErr
 }
