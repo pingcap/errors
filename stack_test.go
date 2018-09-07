@@ -277,8 +277,8 @@ func TestStackTraceFormat(t *testing.T) {
 }
 
 func TestNewStack(t *testing.T) {
-	got := NewStack().StackTrace()
-	want := NewStack().StackTrace()
+	got := NewStack(1).StackTrace()
+	want := NewStack(1).StackTrace()
 	if got[0] != want[0] {
 		t.Errorf("NewStack(remove NewStack): want: %v, got: %v", want, got)
 	}
