@@ -193,7 +193,8 @@ func funcname(name string) string {
 //
 // This function takes an argument for the number of stack frames to skip.
 // This avoids putting stack generation function calls like this one in the stack trace.
-// You probably want to give it a value of 1, which removes the NewStack function from the stack trace.
+// A value of 0 will give you the line that called NewStack(0)
+// A library author wrapping this in their own function will want to use a value of at least 1.
 func NewStack(skip int) StackTracer {
 	return callersSkip(skip + 3)
 }
