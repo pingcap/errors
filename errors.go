@@ -335,3 +335,29 @@ func Find(origErr error, test func(error) bool) error {
 	})
 	return foundErr
 }
+
+// Chain ties together two errors, giving them a Causer interface and a concatenated Error message.
+type chain struct {
+	currentErr error
+	prevErr    error
+}
+
+func (err *chain) Error() string {
+	return err.currentErr.Error() + "\n" + err.prevErr.Error()
+}
+
+func (err *chain) Cause() error {
+	return err.prevErr
+}
+
+// BuildChain constructs a Chain.
+// If the newer error is already a Chain, it will return the original ErrorChain
+// modified so that the previous error is a chain.
+func BuildChain(currentErr error, prevErr error) error {
+	if currentChain, ok := currentErr.(*chain); ok {
+		middleErr := currentChain.prevErr
+		currentChain.prevErr = &chain{middleErr, prevErr}
+		return currentChain
+	}
+	return &chain{currentErr, prevErr}
+}
