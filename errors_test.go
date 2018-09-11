@@ -369,3 +369,13 @@ func TestWalkDeep(t *testing.T) {
 		t.Errorf("found not exists")
 	}
 }
+
+func TestChain(t *testing.T) {
+	if got := Cause(io.EOF).Error(); got != "EOF" {
+		t.Errorf("expected EOF, got %v", got)
+	}
+	caused := "caused"
+	if got := Cause(BuildChain(io.EOF, errors.New(caused))).Error(); got != caused {
+		t.Errorf("BuildChain expected caused")
+	}
+}

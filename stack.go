@@ -16,13 +16,22 @@ type StackTracer interface {
 	StackTrace() StackTrace
 }
 
+type hasGetStackTracer interface {
+	getStackTracer() StackTracer
+}
+
 // GetStackTracer will return the first StackTracer in the causer chain.
 // This function is used by AddStack to avoid creating redundant stack traces.
 //
-// You can also use the StackTracer interface on the returned error to get the stack trace.
+// This function will return nil if there is no StackTracer
 func GetStackTracer(origErr error) StackTracer {
 	var stacked StackTracer
 	WalkDeep(origErr, func(err error) bool {
+		if st, ok := err.(hasGetStackTracer); ok {
+			if stacked = st.getStackTracer(); stacked != nil {
+				return true
+			}
+		}
 		if stackTracer, ok := err.(StackTracer); ok {
 			stacked = stackTracer
 			return true
