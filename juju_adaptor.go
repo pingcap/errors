@@ -12,6 +12,10 @@ func Trace(err error) error {
 	return AddStack(err)
 }
 
+// Annotate returns an error annotated with the given message.
+// If the given error does not have a stack trace, one is added
+// at the point Annotate is called.
+// If err is nil, Annotate returns nil.
 func Annotate(err error, message string) error {
 	if err == nil {
 		return nil
@@ -31,6 +35,7 @@ func Annotate(err error, message string) error {
 	}
 }
 
+// Annotatef behaves the same as Annotate but takes formatter arguments.
 func Annotatef(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil

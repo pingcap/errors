@@ -111,8 +111,7 @@ func Errorf(format string, args ...interface{}) error {
 }
 
 // StackTraceAware is an optimization to avoid repetitive traversals of an error chain.
-// HasStack checks for this marker first.
-// Annotate/Wrap and Annotatef/Wrapf will produce this marker.
+// Annotate/Wrap and Annotatef/Wrapf will produce this interface.
 type StackTraceAware interface {
 	HasStack() bool
 }
@@ -322,16 +321,45 @@ func Find(origErr error, test func(error) bool) error {
 
 // Chain ties together two errors, giving them a Causer interface and a concatenated Error message.
 type chain struct {
-	currentErr error
-	prevErr    error
+	error
+	prevErr error
 }
 
 func (err *chain) Error() string {
-	return err.currentErr.Error() + "\n" + err.prevErr.Error()
+	return err.error.Error()
 }
 
 func (err *chain) Cause() error {
 	return err.prevErr
+}
+
+// getStackTracer implements hasGetStackTracer.
+// Without this override, the GetStackTracer() fucntion would end up skipping the current error.
+// This may return nil.
+func (err *chain) getStackTracer() StackTracer {
+	return GetStackTracer(err.error)
+}
+
+func (err *chain) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			fmt.Fprintf(s, "%+v\n", err.prevErr)
+			if HasStack(err.prevErr) {
+				fmt.Fprintf(s, "%v", err.error)
+			} else {
+				fmt.Fprintf(s, "%+v", err.error)
+			}
+			return
+		}
+		fallthrough
+	case 's':
+		fmt.Fprintf(s, "%s\n", err.prevErr)
+		fmt.Fprintf(s, "%s", err.error)
+	case 'q':
+		fmt.Fprintf(s, "%q\n", err.prevErr)
+		fmt.Fprintf(s, "%q", err.error)
+	}
 }
 
 // BuildChain constructs a Chain.
