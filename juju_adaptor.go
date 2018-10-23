@@ -87,6 +87,7 @@ func NotValidf(format string, args ...interface{}) error {
 	return Errorf(format+" not valid", args...)
 }
 
+// IsAlreadyExists reports whether err was already exists error.
 func IsAlreadyExists(err error) bool {
 	return strings.Contains(err.Error(), "already exists")
 }
