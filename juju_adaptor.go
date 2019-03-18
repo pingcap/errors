@@ -9,6 +9,9 @@ import (
 
 // Trace just calls AddStack.
 func Trace(err error) error {
+	if err == nil {
+		return nil
+	}
 	return AddStack(err)
 }
 
