@@ -66,17 +66,36 @@ func NewNoStackError(msg string) error {
 	}
 }
 
-// WithEmptyStack adds empty stack and suspend following Trace add stack.
-func WithEmptyStack(err error) error {
+// SuspendStack suspends stack generate for error.
+func SuspendStack(err error) error {
 	if err == nil {
 		return err
 	}
-	if HasStack(err) {
+	cleared := clearStack(err)
+	if cleared {
 		return err
 	}
 	return &withStack{
 		err,
 		&emptyStack,
+	}
+}
+
+func clearStack(err error) (cleared bool) {
+	for {
+		switch typedErr := err.(type) {
+		case *withMessage:
+			return clearStack(typedErr.Cause())
+		case *fundamental:
+			typedErr.stack = &emptyStack
+			return true
+		case *withStack:
+			typedErr.stack = &emptyStack
+			clearStack(typedErr.Cause())
+			return true
+		default:
+			return false
+		}
 	}
 }
 
