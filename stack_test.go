@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"testing"
 )
@@ -288,12 +289,22 @@ func TestNewStack(t *testing.T) {
 	}
 }
 
-func TestSuspendStackError(t *testing.T) {
+func TestNewNoStackError(t *testing.T) {
 	err := NewNoStackError("test error")
 	err = Trace(err)
 	err = Trace(err)
 	result := fmt.Sprintf("%+v", err)
 	if result != "test error" {
 		t.Errorf("NewNoStackError(): want %s, got %v", "test error", result)
+	}
+}
+
+func TestSuspendStackError(t *testing.T) {
+	err := io.EOF
+	err = SuspendStack(err)
+	err = Trace(err)
+	result := fmt.Sprintf("%+v", err)
+	if result != "EOF" {
+		t.Errorf("NewNoStackError(): want %s, got %v", "EOF", result)
 	}
 }

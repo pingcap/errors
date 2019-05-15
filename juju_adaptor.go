@@ -66,6 +66,18 @@ func NewNoStackError(msg string) error {
 	}
 }
 
+// SuspendStack suspends stack for a exists error.
+// it can be used to suspend follow up Trace do not add stack.
+func SuspendStack(err error) error {
+	if err == nil {
+		return err
+	}
+	return withStack{
+		err,
+		&emptyStack,
+	}
+}
+
 // ErrorStack will format a stack trace if it is available, otherwise it will be Error()
 // If the error is nil, the empty string is returned
 // Note that this just calls fmt.Sprintf("%+v", err)
