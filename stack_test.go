@@ -299,13 +299,28 @@ func TestNewNoStackError(t *testing.T) {
 	}
 }
 
-func TestSuspendStackError(t *testing.T) {
+func TestSuspendError(t *testing.T) {
 	err := io.EOF
 	err = SuspendStack(err)
 	err = Trace(err)
 	result := fmt.Sprintf("%+v", err)
 	if result != "EOF" {
 		t.Errorf("NewNoStackError(): want %s, got %v", "EOF", result)
+	}
+	if io.EOF != Cause(err) {
+		t.Errorf("SuspendStackError can not got back origion error.")
+	}
+}
+
+func TestSuspendTracedWithMessageError(t *testing.T) {
+	tracedErr := Trace(io.EOF)
+	tracedErr = WithStack(tracedErr)
+	tracedErr = WithMessage(tracedErr, "1")
+	tracedErr = SuspendStack(tracedErr)
+	tracedErr = Trace(tracedErr)
+	result := fmt.Sprintf("%+v", tracedErr)
+	if result != "EOF\n1" {
+		t.Errorf("NewNoStackError(): want %s, got %v", "EOF\n1", result)
 	}
 }
 
