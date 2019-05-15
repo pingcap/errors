@@ -82,9 +82,6 @@ func SuspendStack(err error) error {
 }
 
 func clearStack(err error) (cleared bool) {
-	if err == nil {
-		return false
-	}
 	switch typedErr := err.(type) {
 	case *withMessage:
 		return clearStack(typedErr.Cause())
