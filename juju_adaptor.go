@@ -72,7 +72,7 @@ func SuspendStack(err error) error {
 	if err == nil {
 		return err
 	}
-	return withStack{
+	return &withStack{
 		err,
 		&emptyStack,
 	}

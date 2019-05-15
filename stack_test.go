@@ -307,4 +307,7 @@ func TestSuspendStackError(t *testing.T) {
 	if result != "EOF" {
 		t.Errorf("NewNoStackError(): want %s, got %v", "EOF", result)
 	}
+	if io.EOF != Cause(err) {
+		t.Errorf("SuspendStackErro can not got back origion error.")
+	}
 }
