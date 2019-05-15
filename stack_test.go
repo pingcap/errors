@@ -288,6 +288,16 @@ func TestNewStack(t *testing.T) {
 	}
 }
 
+func TestSuspendStackError(t *testing.T) {
+	err := NewNoStackError("test error")
+	err = Trace(err)
+	err = Trace(err)
+	result := fmt.Sprintf("%+v", err)
+	if result != "test error" {
+		t.Errorf("NewNoStackError(): want %s, got %v", "test error", result)
+	}
+}
+
 // a version of runtime.Caller that returns a Frame, not a uintptr.
 func caller() Frame {
 	var pcs [3]uintptr

@@ -55,6 +55,17 @@ func Annotatef(err error, format string, args ...interface{}) error {
 	}
 }
 
+var emptyStack stack
+
+// NewNoStackError creates error without error stack
+// later duplicate trace will no longer generate Stack too.
+func NewNoStackError(msg string) error {
+	return &fundamental{
+		msg:   msg,
+		stack: &emptyStack,
+	}
+}
+
 // ErrorStack will format a stack trace if it is available, otherwise it will be Error()
 // If the error is nil, the empty string is returned
 // Note that this just calls fmt.Sprintf("%+v", err)
