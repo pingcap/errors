@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -299,15 +300,25 @@ func TestNewNoStackError(t *testing.T) {
 	}
 }
 
-func TestSuspendStackError(t *testing.T) {
+func TestWithEmptyStackError(t *testing.T) {
 	err := io.EOF
-	err = SuspendStack(err)
+	err = WithEmptyStack(err)
 	err = Trace(err)
 	result := fmt.Sprintf("%+v", err)
 	if result != "EOF" {
 		t.Errorf("NewNoStackError(): want %s, got %v", "EOF", result)
 	}
 	if io.EOF != Cause(err) {
-		t.Errorf("SuspendStackErro can not got back origion error.")
+		t.Errorf("SuspendStackError can not got back origion error.")
+	}
+}
+
+func TestWithEmptyStackForTracedError(t *testing.T) {
+	tracedErr := Trace(io.EOF)
+	err := WithEmptyStack(tracedErr)
+	err = WithEmptyStack(tracedErr)
+	result := fmt.Sprintf("%+v", err)
+	if !strings.Contains(result, "TestWithEmptyStackForTracedError") {
+		t.Errorf("SuspendStackError with a traced error need old stack")
 	}
 }

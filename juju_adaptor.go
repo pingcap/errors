@@ -66,10 +66,12 @@ func NewNoStackError(msg string) error {
 	}
 }
 
-// SuspendStack suspends stack for a exists error.
-// it can be used to suspend follow up Trace do not add stack.
-func SuspendStack(err error) error {
+// WithEmptyStack adds empty stack and suspend following Trace add stack.
+func WithEmptyStack(err error) error {
 	if err == nil {
+		return err
+	}
+	if HasStack(err) {
 		return err
 	}
 	return &withStack{
