@@ -85,20 +85,18 @@ func clearStack(err error) (cleared bool) {
 	if err == nil {
 		return false
 	}
-	for {
-		switch typedErr := err.(type) {
-		case *withMessage:
-			return clearStack(typedErr.Cause())
-		case *fundamental:
-			typedErr.stack = &emptyStack
-			return true
-		case *withStack:
-			typedErr.stack = &emptyStack
-			clearStack(typedErr.Cause())
-			return true
-		default:
-			return false
-		}
+	switch typedErr := err.(type) {
+	case *withMessage:
+		return clearStack(typedErr.Cause())
+	case *fundamental:
+		typedErr.stack = &emptyStack
+		return true
+	case *withStack:
+		typedErr.stack = &emptyStack
+		clearStack(typedErr.Cause())
+		return true
+	default:
+		return false
 	}
 }
 
