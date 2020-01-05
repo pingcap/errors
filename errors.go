@@ -77,7 +77,7 @@
 //
 //     if stacked := errors.GetStackTracer(err); stacked != nil {
 //             for _, f := range stacked.StackTrace() {
-//                     fmt.Printf("%+s:%d", f)
+//                     fmt.Printf("%+s:%d\n", f, f)
 //             }
 //     }
 //
