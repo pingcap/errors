@@ -27,6 +27,11 @@ import (
 // Same error code can be used in different error classes.
 type ErrCode int
 
+// ErrCodeText is a textual error code that represents a specific error type in a error class.
+// This string should include component name, see
+// https://github.com/pingcap/tidb/blob/master/docs/design/2020-05-08-standardize-error-codes-and-messages.md#the-error-code-range
+type ErrCodeText string
+
 // ErrClass represents a class of errors.
 type ErrClass int
 
@@ -70,11 +75,23 @@ func (ec ErrClass) NotEqualClass(err error) bool {
 // New defines an *Error with an error code and an error message.
 // Usually used to create base *Error.
 // Currently, this method is same as Synthesize after extracted from parser.
+// deprecated: textual error codes is more readable than numeric error codes, use NewError instead.
 func (ec ErrClass) New(code ErrCode, message string) *Error {
 	return &Error{
 		class:   ec,
 		code:    code,
 		message: message,
+	}
+}
+
+// NewError defines an *Error with an error code, its code message and an error message.
+//
+func (ec ErrClass) NewError(code ErrCode, text ErrCodeText, message string) *Error {
+	return &Error{
+		class:    ec,
+		code:     code,
+		codeText: text,
+		message:  message,
 	}
 }
 
@@ -93,12 +110,14 @@ func (ec ErrClass) Synthesize(code ErrCode, message string) *Error {
 // Error implements error interface and adds integer Class and Code, so
 // errors with different message can be compared.
 type Error struct {
-	class   ErrClass
-	code    ErrCode
-	message string
-	args    []interface{}
-	file    string
-	line    int
+	class ErrClass
+	code  ErrCode
+	// codeText is the textual describe of the error code
+	codeText ErrCodeText
+	message  string
+	args     []interface{}
+	file     string
+	line     int
 }
 
 // Class returns ErrClass
@@ -114,22 +133,25 @@ func (e *Error) Code() ErrCode {
 // MarshalJSON implements json.Marshaler interface.
 func (e *Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		Class ErrClass `json:"class"`
-		Code  ErrCode  `json:"code"`
-		Msg   string   `json:"message"`
+		Class    ErrClass    `json:"class"`
+		Code     ErrCode     `json:"code"`
+		CodeText ErrCodeText `json:"codeText"`
+		Msg      string      `json:"message"`
 	}{
-		Class: e.class,
-		Code:  e.code,
-		Msg:   e.getMsg(),
+		Class:    e.class,
+		Code:     e.code,
+		Msg:      e.getMsg(),
+		CodeText: e.codeText,
 	})
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface.
 func (e *Error) UnmarshalJSON(data []byte) error {
 	err := &struct {
-		Class ErrClass `json:"class"`
-		Code  ErrCode  `json:"code"`
-		Msg   string   `json:"message"`
+		Class    ErrClass    `json:"class"`
+		Code     ErrCode     `json:"code"`
+		Msg      string      `json:"message"`
+		CodeText ErrCodeText `json:"codeText"`
 	}{}
 
 	if err := json.Unmarshal(data, &err); err != nil {
@@ -139,6 +161,7 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 	e.class = err.Class
 	e.code = err.Code
 	e.message = err.Msg
+	e.codeText = err.CodeText
 	return nil
 }
 
@@ -150,7 +173,11 @@ func (e *Error) Location() (file string, line int) {
 
 // Error implements error interface.
 func (e *Error) Error() string {
-	return fmt.Sprintf("[%s:%d]%s", e.class, e.code, e.getMsg())
+	describe := e.codeText
+	if len(describe) == 0 {
+		describe = ErrCodeText(strconv.Itoa(int(e.code)))
+	}
+	return fmt.Sprintf("[%s:%s]%s", e.class, describe, e.getMsg())
 }
 
 func (e *Error) getMsg() string {

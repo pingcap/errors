@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
@@ -99,6 +100,8 @@ func (s *testTErrorSuite) TestJson(c *C) {
 }
 
 var predefinedErr = ClassExecutor.New(terror.ErrCode(123), "predefiend error")
+var predefinedTextualErr = ClassExecutor.NewError(terror.ErrCode(124), "Executor is absent",
+	"executor is taking vacation at %s")
 
 func example() error {
 	err := call()
@@ -172,4 +175,11 @@ func (s *testTErrorSuite) TestErrorEqual(c *C) {
 func (s *testTErrorSuite) TestLog(_ *C) {
 	err := fmt.Errorf("xxx")
 	terror.Log(err)
+}
+
+func (s *testTErrorSuite) TestNewError(c *C) {
+	today := time.Now().Weekday().String()
+	err := predefinedTextualErr.GenWithStackByArgs(today)
+	c.Assert(err, NotNil)
+	c.Assert(err.Error(), Equals, "[executor:DB-EXEC-SUNDAY]executor is taking vacation at "+today)
 }
