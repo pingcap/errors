@@ -19,6 +19,7 @@ import (
 	"github.com/pingcap/errors/terror"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -181,5 +182,46 @@ func (s *testTErrorSuite) TestNewError(c *C) {
 	today := time.Now().Weekday().String()
 	err := predefinedTextualErr.GenWithStackByArgs(today)
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, "[executor:DB-EXEC-SUNDAY]executor is taking vacation at "+today)
+	c.Assert(err.Error(), Equals, "[executor:Executor is absent]executor is taking vacation at "+today)
+}
+
+func (s *testTErrorSuite) TestAllErrClasses(c *C) {
+	items := []terror.ErrClass{
+		ClassExecutor, ClassKV, ClassOptimizer, ClassParser, ClassServer, ClassTable,
+	}
+	registered := terror.AllErrorClasses()
+
+	// sort it to align them.
+	sort.Slice(items, func(i, j int) bool {
+		return items[i] < items[j]
+	})
+	sort.Slice(registered, func(i, j int) bool {
+		return registered[i] < registered[j]
+	})
+
+	for i := range items {
+		c.Assert(items[i], Equals, registered[i])
+	}
+}
+
+func (s *testTErrorSuite) TestErrorExists(c *C) {
+	origin := ClassParser.NewError(114, "everything is alright", "that was a joke, hoo!")
+	c.Assert(func() {
+		_ = ClassParser.NewError(114, "everything is alright", "that was a joke, hoo!")
+	}, Panics, "replicated error prototype created")
+
+	// difference at either code or text should be different error
+	changeCode := ClassParser.NewError(1145, "everything is alright", "that was a joke, hoo!")
+	changeText := ClassParser.NewError(114, "everything goes bad", "that was a joke, hoo!")
+	containsErr := func(e error) bool {
+		for _, err := range ClassParser.AllErrors() {
+			if err.Equal(e) {
+				return true
+			}
+		}
+		return false
+	}
+	c.Assert(containsErr(origin), IsTrue)
+	c.Assert(containsErr(changeCode), IsTrue)
+	c.Assert(containsErr(changeText), IsTrue)
 }

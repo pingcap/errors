@@ -35,7 +35,11 @@ type ErrCodeText string
 // ErrClass represents a class of errors.
 type ErrClass int
 
-var errClass2Desc = make(map[ErrClass]string)
+var (
+	errClass2Desc = make(map[ErrClass]string)
+	// errsOfClass maps some errClass to all errors belongs to it.
+	errsOfClass = make(map[ErrClass][]*Error)
+)
 
 // RegisterErrorClass registers new error class for terror.
 func RegisterErrorClass(classCode int, desc string) ErrClass {
@@ -77,22 +81,45 @@ func (ec ErrClass) NotEqualClass(err error) bool {
 // Currently, this method is same as Synthesize after extracted from parser.
 // deprecated: textual error codes is more readable than numeric error codes, use NewError instead.
 func (ec ErrClass) New(code ErrCode, message string) *Error {
-	return &Error{
-		class:   ec,
-		code:    code,
-		message: message,
-	}
+	return ec.NewError(code, "", message)
 }
 
 // NewError defines an *Error with an error code, its code message and an error message.
-//
+// Note this isn't thread-safe.
 func (ec ErrClass) NewError(code ErrCode, text ErrCodeText, message string) *Error {
-	return &Error{
+	err := &Error{
 		class:    ec,
 		code:     code,
 		codeText: text,
 		message:  message,
 	}
+	// We might can use a map as a set here to speed up this.
+	for _, e := range errsOfClass[ec] {
+		if e.Equal(err) {
+			log.Panic("replicated error prototype created",
+				zap.Int("code", int(code)),
+				zap.String("codeText", string(text)))
+		}
+	}
+	errsOfClass[ec] = append(errsOfClass[ec], err)
+	return err
+}
+
+// AllErrors returns all errors of this ErrClass
+// Note this isn't thread-safe.
+// You shouldn't modify the returned slice without copying.
+func (ec ErrClass) AllErrors() []*Error {
+	return errsOfClass[ec]
+}
+
+// AllErrorClasses returns all errClasses that has been registered.
+// Note this isn't thread-safe.
+func AllErrorClasses() []ErrClass {
+	all := make([]ErrClass, 0, len(errClass2Desc))
+	for errClass := range errClass2Desc {
+		all = append(all, errClass)
+	}
+	return all
 }
 
 // Synthesize synthesizes an *Error in the air
@@ -230,7 +257,7 @@ func (e *Error) Equal(err error) bool {
 		return true
 	}
 	inErr, ok := originErr.(*Error)
-	return ok && e.class == inErr.class && e.code == inErr.code
+	return ok && e.class == inErr.class && e.code == inErr.code && e.codeText == inErr.codeText
 }
 
 // NotEqual checks if err is not equal to e.
