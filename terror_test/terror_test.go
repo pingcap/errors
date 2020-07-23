@@ -15,8 +15,6 @@ package terror_test
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/pingcap/errors/terror"
 	"os"
 	"runtime"
 	"sort"
@@ -32,18 +30,19 @@ import (
 // Those fields below are copied from the original version of terror,
 // so that we can reuse those test cases.
 var (
-	ClassExecutor  = terror.RegisterErrorClass(5, "executor")
-	ClassKV        = terror.RegisterErrorClass(8, "kv")
-	ClassOptimizer = terror.RegisterErrorClass(10, "planner")
-	ClassParser    = terror.RegisterErrorClass(11, "parser")
-	ClassServer    = terror.RegisterErrorClass(15, "server")
-	ClassTable     = terror.RegisterErrorClass(19, "table")
+	reg            = errors.NewRegistry("DB")
+	ClassExecutor  = reg.RegisterErrorClass(5, "executor")
+	ClassKV        = reg.RegisterErrorClass(8, "kv")
+	ClassOptimizer = reg.RegisterErrorClass(10, "planner")
+	ClassParser    = reg.RegisterErrorClass(11, "parser")
+	ClassServer    = reg.RegisterErrorClass(15, "server")
+	ClassTable     = reg.RegisterErrorClass(19, "table")
 )
 
 const (
-	CodeExecResultIsEmpty  terror.ErrCode = 3
-	CodeMissConnectionID   terror.ErrCode = 1
-	CodeResultUndetermined terror.ErrCode = 2
+	CodeExecResultIsEmpty  errors.ErrCode = 3
+	CodeMissConnectionID   errors.ErrCode = 1
+	CodeResultUndetermined errors.ErrCode = 2
 )
 
 func TestT(t *testing.T) {
@@ -57,8 +56,8 @@ type testTErrorSuite struct {
 }
 
 func (s *testTErrorSuite) TestErrCode(c *C) {
-	c.Assert(CodeMissConnectionID, Equals, terror.ErrCode(1))
-	c.Assert(CodeResultUndetermined, Equals, terror.ErrCode(2))
+	c.Assert(CodeMissConnectionID, Equals, errors.ErrCode(1))
+	c.Assert(CodeResultUndetermined, Equals, errors.ErrCode(2))
 }
 
 func (s *testTErrorSuite) TestTError(c *C) {
@@ -67,13 +66,13 @@ func (s *testTErrorSuite) TestTError(c *C) {
 	c.Assert(ClassKV.String(), Not(Equals), "")
 	c.Assert(ClassServer.String(), Not(Equals), "")
 
-	parserErr := ClassParser.New(terror.ErrCode(100), "error 100")
+	parserErr := ClassParser.New(errors.ErrCode(100), "error 100")
 	c.Assert(parserErr.Error(), Not(Equals), "")
 	c.Assert(ClassParser.EqualClass(parserErr), IsTrue)
 	c.Assert(ClassParser.NotEqualClass(parserErr), IsFalse)
 
 	c.Assert(ClassOptimizer.EqualClass(parserErr), IsFalse)
-	optimizerErr := ClassOptimizer.New(terror.ErrCode(2), "abc")
+	optimizerErr := ClassOptimizer.New(errors.ErrCode(2), "abc")
 	c.Assert(ClassOptimizer.EqualClass(errors.New("abc")), IsFalse)
 	c.Assert(ClassOptimizer.EqualClass(nil), IsFalse)
 	c.Assert(optimizerErr.Equal(optimizerErr.GenWithStack("def")), IsTrue)
@@ -93,16 +92,18 @@ func (s *testTErrorSuite) TestJson(c *C) {
 	prevTErr := ClassTable.New(CodeExecResultIsEmpty, "json test")
 	buf, err := json.Marshal(prevTErr)
 	c.Assert(err, IsNil)
-	var curTErr terror.Error
+	var curTErr errors.Error
 	err = json.Unmarshal(buf, &curTErr)
 	c.Assert(err, IsNil)
 	isEqual := prevTErr.Equal(&curTErr)
 	c.Assert(isEqual, IsTrue)
 }
 
-var predefinedErr = ClassExecutor.New(terror.ErrCode(123), "predefiend error")
-var predefinedTextualErr = ClassExecutor.NewError(terror.ErrCode(124), "Executor is absent",
-	"executor is taking vacation at %s")
+var predefinedErr = ClassExecutor.New(errors.ErrCode(123), "predefiend error")
+var predefinedTextualErr = ClassExecutor.DefineError().
+	TextualCode("ExecutorAbsent").
+	MessageTemplate("executor is taking vacation at %s").
+	Done()
 
 func example() error {
 	err := call()
@@ -155,64 +156,72 @@ func (s *testTErrorSuite) TestErrorEqual(c *C) {
 	e5 := errors.Errorf("test error")
 	c.Assert(errors.Cause(e5), Not(Equals), e1)
 
-	c.Assert(terror.ErrorEqual(e1, e2), IsTrue)
-	c.Assert(terror.ErrorEqual(e1, e3), IsTrue)
-	c.Assert(terror.ErrorEqual(e1, e4), IsTrue)
-	c.Assert(terror.ErrorEqual(e1, e5), IsTrue)
+	c.Assert(errors.ErrorEqual(e1, e2), IsTrue)
+	c.Assert(errors.ErrorEqual(e1, e3), IsTrue)
+	c.Assert(errors.ErrorEqual(e1, e4), IsTrue)
+	c.Assert(errors.ErrorEqual(e1, e5), IsTrue)
 
 	var e6 error
 
-	c.Assert(terror.ErrorEqual(nil, nil), IsTrue)
-	c.Assert(terror.ErrorNotEqual(e1, e6), IsTrue)
-	code1 := terror.ErrCode(9001)
-	code2 := terror.ErrCode(9002)
+	c.Assert(errors.ErrorEqual(nil, nil), IsTrue)
+	c.Assert(errors.ErrorNotEqual(e1, e6), IsTrue)
+	code1 := errors.ErrCode(9001)
+	code2 := errors.ErrCode(9002)
 	te1 := ClassParser.Synthesize(code1, "abc")
 	te3 := ClassKV.New(code1, "abc")
 	te4 := ClassKV.New(code2, "abc")
-	c.Assert(terror.ErrorEqual(te1, te3), IsFalse)
-	c.Assert(terror.ErrorEqual(te3, te4), IsFalse)
-}
-
-func (s *testTErrorSuite) TestLog(_ *C) {
-	err := fmt.Errorf("xxx")
-	terror.Log(err)
+	c.Assert(errors.ErrorEqual(te1, te3), IsFalse)
+	c.Assert(errors.ErrorEqual(te3, te4), IsFalse)
 }
 
 func (s *testTErrorSuite) TestNewError(c *C) {
 	today := time.Now().Weekday().String()
 	err := predefinedTextualErr.GenWithStackByArgs(today)
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, "[executor:Executor is absent]executor is taking vacation at "+today)
+	c.Assert(err.Error(), Equals, "[executor:ExecutorAbsent]executor is taking vacation at "+today)
 }
 
 func (s *testTErrorSuite) TestAllErrClasses(c *C) {
-	items := []terror.ErrClass{
+	items := []errors.ErrClass{
 		ClassExecutor, ClassKV, ClassOptimizer, ClassParser, ClassServer, ClassTable,
 	}
-	registered := terror.AllErrorClasses()
+	registered := reg.AllErrorClasses()
 
 	// sort it to align them.
 	sort.Slice(items, func(i, j int) bool {
-		return items[i] < items[j]
+		return items[i].ID < items[j].ID
 	})
 	sort.Slice(registered, func(i, j int) bool {
-		return registered[i] < registered[j]
+		return registered[i].ID < registered[j].ID
 	})
 
 	for i := range items {
-		c.Assert(items[i], Equals, registered[i])
+		c.Assert(items[i].ID, Equals, registered[i].ID)
 	}
 }
 
 func (s *testTErrorSuite) TestErrorExists(c *C) {
-	origin := ClassParser.NewError(114, "everything is alright", "that was a joke, hoo!")
+	origin := ClassParser.DefineError().
+		TextualCode("EverythingAlright").
+		MessageTemplate("that was a joke, hoo!").
+		Done()
+
 	c.Assert(func() {
-		_ = ClassParser.NewError(114, "everything is alright", "that was a joke, hoo!")
+		_ = ClassParser.DefineError().
+			TextualCode("EverythingAlright").
+			MessageTemplate("that was another joke, hoo!").
+			Done()
 	}, Panics, "replicated error prototype created")
 
 	// difference at either code or text should be different error
-	changeCode := ClassParser.NewError(1145, "everything is alright", "that was a joke, hoo!")
-	changeText := ClassParser.NewError(114, "everything goes bad", "that was a joke, hoo!")
+	changeCode := ClassParser.DefineError().
+		NumericCode(4399).
+		MessageTemplate("that was a joke, hoo!").
+		Done()
+	changeText := ClassParser.DefineError().
+		TextualCode("EverythingBad").
+		MessageTemplate("that was not a joke, folks!").
+		Done()
 	containsErr := func(e error) bool {
 		for _, err := range ClassParser.AllErrors() {
 			if err.Equal(e) {
@@ -224,4 +233,28 @@ func (s *testTErrorSuite) TestErrorExists(c *C) {
 	c.Assert(containsErr(origin), IsTrue)
 	c.Assert(containsErr(changeCode), IsTrue)
 	c.Assert(containsErr(changeText), IsTrue)
+}
+
+func (s *testTErrorSuite) TestRFCCode(c *C) {
+	reg := errors.NewRegistry("TEST")
+	errc1 := reg.RegisterErrorClass(1, "TestErr1")
+	errc2 := reg.RegisterErrorClass(2, "TestErr2")
+	c1err1 := errc1.DefineError().
+		TextualCode("Err1").
+		MessageTemplate("nothing").
+		Done()
+	c2err2 := errc2.DefineError().
+		TextualCode("Err2").
+		MessageTemplate("nothing").
+		Done()
+	c.Assert(c1err1.RFCCode(), Equals, "TEST:TestErr1:Err1")
+	c.Assert(c2err2.RFCCode(), Equals, "TEST:TestErr2:Err2")
+	blankReg := errors.NewRegistry("")
+	errb := blankReg.RegisterErrorClass(1, "Blank")
+	berr := errb.DefineError().
+		TextualCode("B1").
+		MessageTemplate("nothing").
+		Workaround(`Do nothing`).
+		Done()
+	c.Assert(berr.RFCCode(), Equals, "Blank:B1")
 }
