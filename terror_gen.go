@@ -25,7 +25,6 @@ const tomlTemplate = `[error.%s]
 error = '''%s'''
 description = '''%s'''
 workaround = '''%s'''
-
 `
 
 func (e *Error) exportTo(writer io.Writer) error {
