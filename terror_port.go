@@ -15,7 +15,10 @@
 
 package errors
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 const (
 	defaultMySQLErrorCode = 1105
@@ -610,4 +613,47 @@ func (e *Error) ToSQLError() *SQLError {
 // Error prints errors, with a formatted string.
 func (e *SQLError) Error() string {
 	return fmt.Sprintf("ERROR %d (%s): %s", e.Code, e.State, e.Message)
+}
+
+// MarshalJSON implements json.Marshaler interface.
+// aware that this function cannot save a 'registered' status,
+// since we cannot access the registry when unmarshaling,
+// and the original global registry would be removed here.
+// This function is reserved for compatibility.
+func (e *Error) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Class    ErrClassID  `json:"class"`
+		Code     ErrCode     `json:"code"`
+		CodeText ErrCodeText `json:"codeText"`
+		Msg      string      `json:"message"`
+	}{
+		Class:    e.class.ID,
+		Code:     e.code,
+		Msg:      e.getMsg(),
+		CodeText: e.codeText,
+	})
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface.
+// aware that this function cannot create a 'registered' error,
+// since we cannot access the registry in this context,
+// and the original global registry is removed.
+// This function is reserved for compatibility.
+func (e *Error) UnmarshalJSON(data []byte) error {
+	err := &struct {
+		Class    ErrClassID  `json:"class"`
+		Code     ErrCode     `json:"code"`
+		Msg      string      `json:"message"`
+		CodeText ErrCodeText `json:"codeText"`
+	}{}
+
+	if err := json.Unmarshal(data, &err); err != nil {
+		return Trace(err)
+	}
+
+	e.class = &ErrClass{ID: err.Class}
+	e.code = err.Code
+	e.message = err.Msg
+	e.codeText = err.CodeText
+	return nil
 }
