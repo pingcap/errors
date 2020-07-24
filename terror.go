@@ -175,7 +175,7 @@ type Error struct {
 	// message is a template of the description of this error.
 	// printf-style formatting is enabled.
 	message string
-	// The workaround filed: how to work around this error.
+	// The workaround field: how to work around this error.
 	// It's used to teach the users how to solve the error if occurring in the real environment.
 	Workaround string
 	// Description is the expanded detail of why this error occurred.
