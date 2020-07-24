@@ -1,4 +1,4 @@
-// Copyright 2015 PingCAP, Inc.
+// Copyright 2020 PingCAP, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pingcap/log"
+	"go.uber.org/zap"
 	"strconv"
 )
 
@@ -70,6 +71,14 @@ func (ec *ErrClass) String() string {
 	return ec.Description
 }
 
+// Equal tests whether the other error is in this class.
+func (ec *ErrClass) Equal(other *ErrClass) bool {
+	if ec == nil || other == nil {
+		return ec == other
+	}
+	return ec.ID == other.ID
+}
+
 // EqualClass returns true if err is *Error with the same class.
 func (ec *ErrClass) EqualClass(err error) bool {
 	e := Cause(err)
@@ -77,7 +86,7 @@ func (ec *ErrClass) EqualClass(err error) bool {
 		return false
 	}
 	if te, ok := e.(*Error); ok {
-		return te.class.ID == ec.ID
+		return te.class.Equal(ec)
 	}
 	return false
 }
@@ -196,6 +205,9 @@ func (e *Error) Code() ErrCode {
 // https://github.com/pingcap/tidb/blob/master/docs/design/2020-05-08-standardize-error-codes-and-messages.md#the-error-code-range
 func (e *Error) RFCCode() RFCErrorCode {
 	ec := e.Class()
+	if ec == nil {
+		return e.ID()
+	}
 	reg := ec.registry
 	// Maybe top-level errors.
 	if reg.Name == "" {
@@ -268,13 +280,18 @@ func (e *Error) Location() (file string, line int) {
 	return e.file, e.line
 }
 
+// MessageTemplate returns the error message template of this error.
+func (e *Error) MessageTemplate() string {
+	return e.message
+}
+
 // Error implements error interface.
 func (e *Error) Error() string {
 	describe := e.codeText
 	if len(describe) == 0 {
 		describe = ErrCodeText(strconv.Itoa(int(e.code)))
 	}
-	return fmt.Sprintf("[%s:%s]%s", e.class, describe, e.getMsg())
+	return fmt.Sprintf("[%s:%s] %s", e.class, describe, e.getMsg())
 }
 
 func (e *Error) getMsg() string {
@@ -322,12 +339,16 @@ func (e *Error) Equal(err error) bool {
 	if originErr == nil {
 		return false
 	}
-
 	if error(e) == originErr {
 		return true
 	}
 	inErr, ok := originErr.(*Error)
-	return ok && e.class.ID == inErr.class.ID && e.ID() == inErr.ID()
+	if !ok {
+		return false
+	}
+	classEquals := e.class.Equal(inErr.class)
+	idEquals := e.ID() == inErr.ID()
+	return classEquals && idEquals
 }
 
 // NotEqual checks if err is not equal to e.
@@ -351,7 +372,7 @@ func ErrorEqual(err1, err2 error) bool {
 	te1, ok1 := e1.(*Error)
 	te2, ok2 := e2.(*Error)
 	if ok1 && ok2 {
-		return te1.class == te2.class && te1.code == te2.code && te1.codeText == te2.codeText
+		return te1.Equal(te2)
 	}
 
 	return e1.Error() == e2.Error()
@@ -409,7 +430,9 @@ func (b *Builder) MessageTemplate(template string) *Builder {
 // Done ends the define of the error.
 func (b *Builder) Done() *Error {
 	if ok := b.class.RegisterError(b.err); !ok {
-		log.Panic("replicated error prototype created")
+		log.Panic("replicated error prototype created",
+			zap.String("ID", b.err.ID()),
+			zap.String("RFCCode", b.err.RFCCode()))
 	}
 	return b.err
 }

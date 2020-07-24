@@ -1,4 +1,4 @@
-// Copyright 2015 PingCAP, Inc.
+// Copyright 2020 PingCAP, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 package terror_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"runtime"
@@ -85,7 +86,7 @@ func (s *testTErrorSuite) TestTError(c *C) {
 	kvErr := ClassKV.New(1062, "key already exist")
 	e := kvErr.FastGen("Duplicate entry '%d' for key 'PRIMARY'", 1)
 	c.Assert(e, NotNil)
-	c.Assert(e.Error(), Equals, "[kv:1062]Duplicate entry '1' for key 'PRIMARY'")
+	c.Assert(e.Error(), Equals, "[kv:1062] Duplicate entry '1' for key 'PRIMARY'")
 }
 
 func (s *testTErrorSuite) TestJson(c *C) {
@@ -178,7 +179,7 @@ func (s *testTErrorSuite) TestNewError(c *C) {
 	today := time.Now().Weekday().String()
 	err := predefinedTextualErr.GenWithStackByArgs(today)
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, "[executor:ExecutorAbsent]executor is taking vacation at "+today)
+	c.Assert(err.Error(), Equals, "[executor:ExecutorAbsent] executor is taking vacation at "+today)
 }
 
 func (s *testTErrorSuite) TestAllErrClasses(c *C) {
@@ -257,4 +258,45 @@ func (s *testTErrorSuite) TestRFCCode(c *C) {
 		Workaround(`Do nothing`).
 		Done()
 	c.Assert(berr.RFCCode(), Equals, "Blank:B1")
+}
+
+const simpleTOML = `[error.KV:2PC:8005]
+error = '''Write Conflict, txnStartTS is stale'''
+description = '''A certain Raft Group is not available, such as the number of replicas is not enough.
+This error usually occurs when the TiKV server is busy or the TiKV node is down.'''
+` + "workaround = '''Check whether `tidb_disable_txn_auto_retry` is set to `on`. If so, set it to `off`; " +
+	"if it is already `off`, increase the value of `tidb_retry_limit` until the error no longer occurs.'''\n" + `
+[error.KV:Region:Unavailable]
+error = '''Region is unavailable'''
+description = '''A certain Raft Group is not available, such as the number of replicas is not enough.
+This error usually occurs when the TiKV server is busy or the TiKV node is down.'''
+workaround = '''Check the status, monitoring data and log of the TiKV server.'''
+
+`
+
+func (*testTErrorSuite) TestExport(c *C) {
+	RegKV := errors.NewRegistry("KV")
+	Class2PC := RegKV.RegisterErrorClass(1, "2PC")
+	_ = Class2PC.DefineError().
+		NumericCode(8005).
+		Description("A certain Raft Group is not available, such as the number of replicas is not enough.\n" +
+			"This error usually occurs when the TiKV server is busy or the TiKV node is down.").
+		Workaround("Check whether `tidb_disable_txn_auto_retry` is set to `on`. If so, set it to `off`; " +
+			"if it is already `off`, increase the value of `tidb_retry_limit` until the error no longer occurs.").
+		MessageTemplate("Write Conflict, txnStartTS is stale").
+		Done()
+
+	ClassRegion := RegKV.RegisterErrorClass(2, "Region")
+	_ = ClassRegion.DefineError().
+		TextualCode("Unavailable").
+		Description("A certain Raft Group is not available, such as the number of replicas is not enough.\n" +
+			"This error usually occurs when the TiKV server is busy or the TiKV node is down.").
+		Workaround("Check the status, monitoring data and log of the TiKV server.").
+		MessageTemplate("Region is unavailable").
+		Done()
+
+	result := bytes.NewBuffer([]byte{})
+	err := RegKV.ExportTo(result)
+	c.Assert(err, IsNil)
+	c.Assert(result.String(), Equals, simpleTOML)
 }
