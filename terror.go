@@ -35,6 +35,7 @@ type ErrCode int
 type ErrCodeText string
 
 // ErrClass represents a class of errors.
+// You can create error 'prototypes' of this class.
 type ErrClass struct {
 	ID          ErrClassID
 	Description string
@@ -165,8 +166,30 @@ func (ec *ErrClass) Synthesize(code ErrCode, message string) *Error {
 	}
 }
 
-// Error implements error interface and adds integer Class and Code, so
-// errors with different message can be compared.
+// Error is the 'prototype' of all errors you defined.
+// Use DefineError to make a *Error:
+// var ErrUnavailable = ClassRegion.DefineError().
+//		TextualCode("Unavailable").
+//		Description("A certain Raft Group is not available, such as the number of replicas is not enough.\n" +
+//			"This error usually occurs when the TiKV server is busy or the TiKV node is down.").
+//		Workaround("Check the status, monitoring data and log of the TiKV server.").
+//		MessageTemplate("Region %d is unavailable").
+//		Done()
+//
+// "throw" it at runtime:
+// func Somewhat() error {
+//     ...
+//     if err != nil {
+//         // generate a stackful error use the message template at defining,
+//         // also see FastGen(it's stackless), GenWithStack(it uses custom message template).
+//         return ErrUnavailable.GenWithStackByArgs(region.ID)
+//     }
+// }
+//
+// testing whether an error belongs to a prototype:
+// if ErrUnavailable.Equal(err) {
+//     // handle this error.
+// }
 type Error struct {
 	class *ErrClass
 	code  ErrCode

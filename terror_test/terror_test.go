@@ -78,6 +78,7 @@ func (s *testTErrorSuite) TestTError(c *C) {
 	c.Assert(ClassOptimizer.EqualClass(errors.New("abc")), IsFalse)
 	c.Assert(ClassOptimizer.EqualClass(nil), IsFalse)
 	c.Assert(optimizerErr.Equal(optimizerErr.GenWithStack("def")), IsTrue)
+	c.Assert(optimizerErr.Equal(errors.Trace(optimizerErr.GenWithStack("def"))), IsTrue)
 	c.Assert(optimizerErr.Equal(nil), IsFalse)
 	c.Assert(optimizerErr.Equal(errors.New("abc")), IsFalse)
 
