@@ -18,6 +18,7 @@ import (
 	"github.com/pingcap/log"
 	"go.uber.org/zap"
 	"io"
+	"regexp"
 )
 
 const tomlTemplate = `[error.%s]
@@ -28,15 +29,17 @@ workaround = '''%s'''
 `
 
 func (e *Error) exportTo(writer io.Writer) error {
+	desc := e.Description
 	if e.Description == "" {
 		log.Warn("error description missed", zap.String("error", e.RFCCode()))
-		e.Description = "N/A"
+		desc = "N/A"
 	}
+	workaround := e.Workaround
 	if e.Workaround == "" {
 		log.Warn("error workaround missed", zap.String("error", e.RFCCode()))
-		e.Workaround = "N/A"
+		workaround = "N/A"
 	}
-	_, err := fmt.Fprintf(writer, tomlTemplate, e.RFCCode(), e.MessageTemplate(), e.Description, e.Workaround)
+	_, err := fmt.Fprintf(writer, tomlTemplate, e.RFCCode(), replaceFlags(e.MessageTemplate()), desc, workaround)
 	return err
 }
 
@@ -57,4 +60,21 @@ func (r *Registry) ExportTo(writer io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// CPP printf flag with minimal support for explicit argument indexes.
+// introductory % character: %
+// (optional) one or more flags that modify the behavior of the conversion: [+\-# 0]?
+// (optional) integer value or * that specifies minimum field width: ([0-9]+|(\[[0-9]+])?\*)?
+// (optional) . followed by integer number or *, or neither that specifies precision of the conversion: (\.([0-9]+|(\[[0-9]+])?\*))?
+//     the prepending (\[[0-9]+])? is for golang explicit argument indexes:
+//     The same notation before a '*' for a width or precision selects the argument index holding the value.
+// (optional) the notation [n] immediately before the verb indicates
+//     that the nth one-indexed argument is to be formatted instead: (\[[0-9]+])?
+// conversion format specifier: [vTtbcdoOqxXUeEfFgGsp]
+// %% shouldn't be replaced.
+var flagRe, _ = regexp.Compile(`%[+\-# 0]?([0-9]+|(\[[0-9]+])?\*)?(\.([0-9]+|(\[[0-9]+])?\*))?(\[[0-9]+])?[vTtbcdoOqxXUeEfFgGsp]`)
+
+func replaceFlags(origin string) string {
+	return string(flagRe.ReplaceAll([]byte(origin), []byte("{placeholder}")))
 }

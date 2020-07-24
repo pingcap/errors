@@ -16,6 +16,7 @@ package terror_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"runtime"
 	"sort"
@@ -260,19 +261,25 @@ func (s *testTErrorSuite) TestRFCCode(c *C) {
 	c.Assert(berr.RFCCode(), Equals, "Blank:B1")
 }
 
-const simpleTOML = `[error.KV:2PC:8005]
+const (
+	somewhatErrorTOML = `[error.KV:Somewhat:Foo]
+error = '''some {placeholder} thing happened, and some {placeholder} goes verbose. I'm {placeholder} percent confusing...
+Maybe only {placeholder} peaces of placeholders can save me... Oh my {placeholder}.{placeholder}!'''
+description = '''N/A'''
+workaround = '''N/A'''`
+	err8005TOML = `[error.KV:2PC:8005]
 error = '''Write Conflict, txnStartTS is stale'''
 description = '''A certain Raft Group is not available, such as the number of replicas is not enough.
 This error usually occurs when the TiKV server is busy or the TiKV node is down.'''
 ` + "workaround = '''Check whether `tidb_disable_txn_auto_retry` is set to `on`. If so, set it to `off`; " +
-	"if it is already `off`, increase the value of `tidb_retry_limit` until the error no longer occurs.'''\n" + `
-[error.KV:Region:Unavailable]
+		"if it is already `off`, increase the value of `tidb_retry_limit` until the error no longer occurs.'''"
+
+	errUnavailableTOML = `[error.KV:Region:Unavailable]
 error = '''Region is unavailable'''
 description = '''A certain Raft Group is not available, such as the number of replicas is not enough.
 This error usually occurs when the TiKV server is busy or the TiKV node is down.'''
-workaround = '''Check the status, monitoring data and log of the TiKV server.'''
-
-`
+workaround = '''Check the status, monitoring data and log of the TiKV server.'''`
+)
 
 func (*testTErrorSuite) TestExport(c *C) {
 	RegKV := errors.NewRegistry("KV")
@@ -295,8 +302,20 @@ func (*testTErrorSuite) TestExport(c *C) {
 		MessageTemplate("Region is unavailable").
 		Done()
 
+	ClassSomewhat := RegKV.RegisterErrorClass(3, "Somewhat")
+	_ = ClassSomewhat.DefineError().
+		TextualCode("Foo").
+		MessageTemplate("some %.6s thing happened, and some %#v goes verbose. I'm %6.3f percent confusing...\n" +
+			"Maybe only %[3]*.[2]*[1]f peaces of placeholders can save me... Oh my %s.%d!").
+		Done()
+
 	result := bytes.NewBuffer([]byte{})
 	err := RegKV.ExportTo(result)
 	c.Assert(err, IsNil)
-	c.Assert(result.String(), Equals, simpleTOML)
+	resultStr := result.String()
+	fmt.Println("Reulst: ")
+	fmt.Print(resultStr)
+	c.Assert(strings.Contains(resultStr, somewhatErrorTOML), IsTrue)
+	c.Assert(strings.Contains(resultStr, err8005TOML), IsTrue)
+	c.Assert(strings.Contains(resultStr, errUnavailableTOML), IsTrue)
 }
