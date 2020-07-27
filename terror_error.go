@@ -14,6 +14,7 @@
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 )
@@ -215,4 +216,47 @@ func ErrorEqual(err1, err2 error) bool {
 // ErrorNotEqual returns a boolean indicating whether err1 isn't equal to err2.
 func ErrorNotEqual(err1, err2 error) bool {
 	return !ErrorEqual(err1, err2)
+}
+
+// MarshalJSON implements json.Marshaler interface.
+// aware that this function cannot save a 'registered' status,
+// since we cannot access the registry when unmarshaling,
+// and the original global registry would be removed here.
+// This function is reserved for compatibility.
+func (e *Error) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Class    ErrClassID  `json:"class"`
+		Code     ErrCode     `json:"code"`
+		CodeText ErrCodeText `json:"codeText"`
+		Msg      string      `json:"message"`
+	}{
+		Class:    e.class.ID,
+		Code:     e.code,
+		Msg:      e.getMsg(),
+		CodeText: e.codeText,
+	})
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface.
+// aware that this function cannot create a 'registered' error,
+// since we cannot access the registry in this context,
+// and the original global registry is removed.
+// This function is reserved for compatibility.
+func (e *Error) UnmarshalJSON(data []byte) error {
+	err := &struct {
+		Class    ErrClassID  `json:"class"`
+		Code     ErrCode     `json:"code"`
+		Msg      string      `json:"message"`
+		CodeText ErrCodeText `json:"codeText"`
+	}{}
+
+	if err := json.Unmarshal(data, &err); err != nil {
+		return Trace(err)
+	}
+
+	e.class = &ErrClass{ID: err.Class}
+	e.code = err.Code
+	e.message = err.Msg
+	e.codeText = err.CodeText
+	return nil
 }
