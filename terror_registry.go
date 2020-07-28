@@ -113,7 +113,7 @@ func (ec *ErrClass) New(code ErrCode, message string) *Error {
 	return ec.DefineError().
 		NumericCode(code).
 		MessageTemplate(message).
-		Done()
+		Build()
 }
 
 // DefineError is the entrance of the define error DSL,
@@ -122,7 +122,7 @@ func (ec *ErrClass) New(code ErrCode, message string) *Error {
 // ClassExecutor.DefineError().
 //	TextualCode("ExecutorAbsent").
 //	MessageTemplate("executor is taking vacation at %s").
-//	Done()
+//	Build()
 // ```
 func (ec *ErrClass) DefineError() *Builder {
 	return &Builder{

@@ -106,7 +106,7 @@ var predefinedErr = ClassExecutor.New(errors.ErrCode(123), "predefiend error")
 var predefinedTextualErr = ClassExecutor.DefineError().
 	TextualCode("ExecutorAbsent").
 	MessageTemplate("executor is taking vacation at %s").
-	Done()
+	Build()
 
 func example() error {
 	err := call()
@@ -207,24 +207,24 @@ func (s *testTErrorSuite) TestErrorExists(c *C) {
 	origin := ClassParser.DefineError().
 		TextualCode("EverythingAlright").
 		MessageTemplate("that was a joke, hoo!").
-		Done()
+		Build()
 
 	c.Assert(func() {
 		_ = ClassParser.DefineError().
 			TextualCode("EverythingAlright").
 			MessageTemplate("that was another joke, hoo!").
-			Done()
+			Build()
 	}, Panics, "replicated error prototype created")
 
 	// difference at either code or text should be different error
 	changeCode := ClassParser.DefineError().
 		NumericCode(4399).
 		MessageTemplate("that was a joke, hoo!").
-		Done()
+		Build()
 	changeText := ClassParser.DefineError().
 		TextualCode("EverythingBad").
 		MessageTemplate("that was not a joke, folks!").
-		Done()
+		Build()
 	containsErr := func(e error) bool {
 		for _, err := range ClassParser.AllErrors() {
 			if err.Equal(e) {
@@ -245,11 +245,11 @@ func (s *testTErrorSuite) TestRFCCode(c *C) {
 	c1err1 := errc1.DefineError().
 		TextualCode("Err1").
 		MessageTemplate("nothing").
-		Done()
+		Build()
 	c2err2 := errc2.DefineError().
 		TextualCode("Err2").
 		MessageTemplate("nothing").
-		Done()
+		Build()
 	c.Assert(c1err1.RFCCode(), Equals, errors.RFCErrorCode("TEST:TestErr1:Err1"))
 	c.Assert(c2err2.RFCCode(), Equals, errors.RFCErrorCode("TEST:TestErr2:Err2"))
 	blankReg := errors.NewRegistry("")
@@ -258,7 +258,7 @@ func (s *testTErrorSuite) TestRFCCode(c *C) {
 		TextualCode("B1").
 		MessageTemplate("nothing").
 		Workaround(`Do nothing`).
-		Done()
+		Build()
 	c.Assert(berr.RFCCode(), Equals, errors.RFCErrorCode("Blank:B1"))
 }
 
@@ -293,7 +293,7 @@ func (*testTErrorSuite) TestExport(c *C) {
 		Workaround("Check whether `tidb_disable_txn_auto_retry` is set to `on`. If so, set it to `off`; " +
 			"if it is already `off`, increase the value of `tidb_retry_limit` until the error no longer occurs.").
 		MessageTemplate("Write Conflict, txnStartTS is stale").
-		Done()
+		Build()
 
 	ClassRegion := RegKV.RegisterErrorClass(2, "Region")
 	_ = ClassRegion.DefineError().
@@ -302,14 +302,14 @@ func (*testTErrorSuite) TestExport(c *C) {
 			"This error usually occurs when the TiKV server is busy or the TiKV node is down.").
 		Workaround("Check the status, monitoring data and log of the TiKV server.").
 		MessageTemplate("Region is unavailable").
-		Done()
+		Build()
 
 	ClassSomewhat := RegKV.RegisterErrorClass(3, "Somewhat")
 	_ = ClassSomewhat.DefineError().
 		TextualCode("Foo").
 		MessageTemplate("some %.6s thing happened, and some %#v goes verbose. I'm %6.3f percent confusing...\n" +
 			"Maybe only %[3]*.[2]*[1]f peaces of placeholders can save me... Oh my %s.%d!").
-		Done()
+		Build()
 
 	result := bytes.NewBuffer([]byte{})
 	err := RegKV.ExportTo(result)

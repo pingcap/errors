@@ -29,7 +29,7 @@ import (
 //			"This error usually occurs when the TiKV server is busy or the TiKV node is down.").
 //		Workaround("Check the status, monitoring data and log of the TiKV server.").
 //		MessageTemplate("Region %d is unavailable").
-//		Done()
+//		Build()
 //
 // "throw" it at runtime:
 // func Somewhat() error {

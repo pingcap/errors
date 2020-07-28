@@ -62,8 +62,8 @@ func (b *Builder) MessageTemplate(template string) *Builder {
 	return b
 }
 
-// Done ends the define of the error.
-func (b *Builder) Done() *Error {
+// Build ends the define of the error.
+func (b *Builder) Build() *Error {
 	if ok := b.class.RegisterError(b.err); !ok {
 		log.Panic("replicated error prototype created",
 			zap.String("ID", string(b.err.ID())),
