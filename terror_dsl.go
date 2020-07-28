@@ -66,8 +66,8 @@ func (b *Builder) MessageTemplate(template string) *Builder {
 func (b *Builder) Done() *Error {
 	if ok := b.class.RegisterError(b.err); !ok {
 		log.Panic("replicated error prototype created",
-			zap.String("ID", b.err.ID()),
-			zap.String("RFCCode", b.err.RFCCode()))
+			zap.String("ID", string(b.err.ID())),
+			zap.String("RFCCode", string(b.err.RFCCode())))
 	}
 	return b.err
 }

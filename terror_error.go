@@ -16,7 +16,9 @@ package errors
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strconv"
+	"strings"
 )
 
 // Error is the 'prototype' of a type of errors.
@@ -84,29 +86,29 @@ func (e *Error) Code() ErrCode {
 func (e *Error) RFCCode() RFCErrorCode {
 	ec := e.Class()
 	if ec == nil {
-		return e.ID()
+		return RFCErrorCode(e.ID())
 	}
 	reg := ec.registry
 	// Maybe top-level errors.
 	if reg.Name == "" {
-		return fmt.Sprintf("%s:%s",
+		return RFCErrorCode(fmt.Sprintf("%s:%s",
 			ec.Description,
 			e.ID(),
-		)
+		))
 	}
-	return fmt.Sprintf("%s:%s:%s",
+	return RFCErrorCode(fmt.Sprintf("%s:%s:%s",
 		reg.Name,
 		ec.Description,
 		e.ID(),
-	)
+	))
 }
 
 // ID returns the ID of this error.
 func (e *Error) ID() ErrorID {
 	if e.codeText != "" {
-		return string(e.codeText)
+		return ErrorID(e.codeText)
 	}
-	return strconv.Itoa(int(e.code))
+	return ErrorID(strconv.Itoa(int(e.code)))
 }
 
 // Location returns the location where the error is created,
@@ -126,7 +128,7 @@ func (e *Error) Error() string {
 	if len(describe) == 0 {
 		describe = ErrCodeText(strconv.Itoa(int(e.code)))
 	}
-	return fmt.Sprintf("[%s:%s] %s", e.class, describe, e.getMsg())
+	return fmt.Sprintf("[%s] %s", e.RFCCode(), e.getMsg())
 }
 
 func (e *Error) getMsg() string {
@@ -136,11 +138,24 @@ func (e *Error) getMsg() string {
 	return e.message
 }
 
+func (e *Error) fillLineAndFile(skip int) {
+	// skip this
+	_, file, line, ok := runtime.Caller(skip + 1)
+	if !ok {
+		e.file = "<unknown>"
+		e.line = -1
+		return
+	}
+	e.file = file
+	e.line = line
+}
+
 // GenWithStack generates a new *Error with the same class and code, and a new formatted message.
 func (e *Error) GenWithStack(format string, args ...interface{}) error {
 	err := *e
 	err.message = format
 	err.args = args
+	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
 
@@ -148,6 +163,7 @@ func (e *Error) GenWithStack(format string, args ...interface{}) error {
 func (e *Error) GenWithStackByArgs(args ...interface{}) error {
 	err := *e
 	err.args = args
+	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
 
@@ -218,22 +234,30 @@ func ErrorNotEqual(err1, err2 error) bool {
 	return !ErrorEqual(err1, err2)
 }
 
+type jsonError struct {
+	RFCCode     RFCErrorCode `json:"code"`
+	Error       string       `json:"message"`
+	Description string       `json:"description,omitempty"`
+	Workaround  string       `json:"workaround,omitempty"`
+	Class       ErrClassID   `json:"classID"`
+	File        string       `json:"file"`
+	Line        int          `json:"line"`
+}
+
 // MarshalJSON implements json.Marshaler interface.
 // aware that this function cannot save a 'registered' status,
 // since we cannot access the registry when unmarshaling,
 // and the original global registry would be removed here.
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Class    ErrClassID  `json:"class"`
-		Code     ErrCode     `json:"code"`
-		CodeText ErrCodeText `json:"codeText"`
-		Msg      string      `json:"message"`
-	}{
-		Class:    e.class.ID,
-		Code:     e.code,
-		Msg:      e.getMsg(),
-		CodeText: e.codeText,
+	return json.Marshal(&jsonError{
+		Error:       e.getMsg(),
+		Description: e.Description,
+		Workaround:  e.Workaround,
+		RFCCode:     e.RFCCode(),
+		Class:       e.class.ID,
+		Line:        e.line,
+		File:        e.file,
 	})
 }
 
@@ -243,20 +267,27 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 // and the original global registry is removed.
 // This function is reserved for compatibility.
 func (e *Error) UnmarshalJSON(data []byte) error {
-	err := &struct {
-		Class    ErrClassID  `json:"class"`
-		Code     ErrCode     `json:"code"`
-		Msg      string      `json:"message"`
-		CodeText ErrCodeText `json:"codeText"`
-	}{}
+	err := &jsonError{}
 
 	if err := json.Unmarshal(data, &err); err != nil {
 		return Trace(err)
 	}
-
-	e.class = &ErrClass{ID: err.Class}
-	e.code = err.Code
-	e.message = err.Msg
-	e.codeText = err.CodeText
+	codes := strings.Split(string(err.RFCCode), ":")
+	regName := codes[0]
+	className := codes[1]
+	innerCode := codes[2]
+	if i, errAtoi := strconv.Atoi(innerCode); errAtoi == nil {
+		e.code = ErrCode(i)
+	} else {
+		e.codeText = ErrCodeText(innerCode)
+	}
+	e.line = err.Line
+	e.file = err.File
+	e.message = err.Error
+	e.class = &ErrClass{
+		Description: className,
+		ID:          err.Class,
+		registry:    &Registry{Name: regName},
+	}
 	return nil
 }

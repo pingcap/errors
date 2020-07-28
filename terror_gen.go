@@ -30,12 +30,12 @@ workaround = '''%s'''
 func (e *Error) exportTo(writer io.Writer) error {
 	desc := e.Description
 	if e.Description == "" {
-		log.Warn("error description missed", zap.String("error", e.RFCCode()))
+		log.Warn("error description missed", zap.String("error", string(e.RFCCode())))
 		desc = "N/A"
 	}
 	workaround := e.Workaround
 	if e.Workaround == "" {
-		log.Warn("error workaround missed", zap.String("error", e.RFCCode()))
+		log.Warn("error workaround missed", zap.String("error", string(e.RFCCode())))
 		workaround = "N/A"
 	}
 	_, err := fmt.Fprintf(writer, tomlTemplate, e.RFCCode(), replaceFlags(e.MessageTemplate()), desc, workaround)

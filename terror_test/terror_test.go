@@ -88,7 +88,7 @@ func (s *testTErrorSuite) TestTError(c *C) {
 	kvErr := ClassKV.New(1062, "key already exist")
 	e := kvErr.FastGen("Duplicate entry '%d' for key 'PRIMARY'", 1)
 	c.Assert(e, NotNil)
-	c.Assert(e.Error(), Equals, "[kv:1062] Duplicate entry '1' for key 'PRIMARY'")
+	c.Assert(e.Error(), Equals, "[DB:kv:1062] Duplicate entry '1' for key 'PRIMARY'")
 }
 
 func (s *testTErrorSuite) TestJson(c *C) {
@@ -181,7 +181,7 @@ func (s *testTErrorSuite) TestNewError(c *C) {
 	today := time.Now().Weekday().String()
 	err := predefinedTextualErr.GenWithStackByArgs(today)
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, "[executor:ExecutorAbsent] executor is taking vacation at "+today)
+	c.Assert(err.Error(), Equals, "[DB:executor:ExecutorAbsent] executor is taking vacation at "+today)
 }
 
 func (s *testTErrorSuite) TestAllErrClasses(c *C) {
@@ -250,8 +250,8 @@ func (s *testTErrorSuite) TestRFCCode(c *C) {
 		TextualCode("Err2").
 		MessageTemplate("nothing").
 		Done()
-	c.Assert(c1err1.RFCCode(), Equals, "TEST:TestErr1:Err1")
-	c.Assert(c2err2.RFCCode(), Equals, "TEST:TestErr2:Err2")
+	c.Assert(c1err1.RFCCode(), Equals, errors.RFCErrorCode("TEST:TestErr1:Err1"))
+	c.Assert(c2err2.RFCCode(), Equals, errors.RFCErrorCode("TEST:TestErr2:Err2"))
 	blankReg := errors.NewRegistry("")
 	errb := blankReg.RegisterErrorClass(1, "Blank")
 	berr := errb.DefineError().
@@ -259,7 +259,7 @@ func (s *testTErrorSuite) TestRFCCode(c *C) {
 		MessageTemplate("nothing").
 		Workaround(`Do nothing`).
 		Done()
-	c.Assert(berr.RFCCode(), Equals, "Blank:B1")
+	c.Assert(berr.RFCCode(), Equals, errors.RFCErrorCode("Blank:B1"))
 }
 
 const (
@@ -320,4 +320,22 @@ func (*testTErrorSuite) TestExport(c *C) {
 	c.Assert(strings.Contains(resultStr, somewhatErrorTOML), IsTrue)
 	c.Assert(strings.Contains(resultStr, err8005TOML), IsTrue)
 	c.Assert(strings.Contains(resultStr, errUnavailableTOML), IsTrue)
+}
+
+func (*testTErrorSuite) TestLineAndFile(c *C) {
+	err := predefinedTextualErr.GenWithStackByArgs("everyday")
+	_, f, l, _ := runtime.Caller(0)
+	terr, ok := errors.Cause(err).(*errors.Error)
+	c.Assert(ok, IsTrue)
+	file, line := terr.Location()
+	c.Assert(file, Equals, f)
+	c.Assert(line, Equals, l-1)
+
+	err2 := predefinedTextualErr.GenWithStackByArgs("everyday and everywhere")
+	_, f2, l2, _ := runtime.Caller(0)
+	terr2, ok2 := errors.Cause(err2).(*errors.Error)
+	c.Assert(ok2, IsTrue)
+	file2, line2 := terr2.Location()
+	c.Assert(file2, Equals, f2)
+	c.Assert(line2, Equals, l2-1)
 }
