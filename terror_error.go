@@ -128,7 +128,7 @@ func (e *Error) Error() string {
 	if len(describe) == 0 {
 		describe = ErrCodeText(strconv.Itoa(int(e.code)))
 	}
-	return fmt.Sprintf("[%s] %s", e.RFCCode(), e.getMsg())
+	return fmt.Sprintf("[%s] %s", e.RFCCode(), e.GetMsg())
 }
 
 func (e *Error) GetMsg() string {
@@ -251,7 +251,7 @@ type jsonError struct {
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&jsonError{
-		Error:       e.getMsg(),
+		Error:       e.GetMsg(),
 		Description: e.Description,
 		Workaround:  e.Workaround,
 		RFCCode:     e.RFCCode(),
