@@ -27,6 +27,25 @@ type Registry struct {
 // Same error code can be used in different error classes.
 type ErrCode int
 
+const (
+	// Executor error codes.
+
+	// CodeUnknown is for errors of unknown reason.
+	CodeUnknown ErrCode = -1
+	// CodeExecResultIsEmpty indicates execution result is empty.
+	CodeExecResultIsEmpty ErrCode = 3
+
+	// Expression error codes.
+
+	// CodeMissConnectionID indicates connection id is missing.
+	CodeMissConnectionID ErrCode = 1
+
+	// Special error codes.
+
+	// CodeResultUndetermined indicates the sql execution result is undetermined.
+	CodeResultUndetermined ErrCode = 2
+)
+
 // ErrCodeText is a textual error code that represents a specific error type in a error class.
 type ErrCodeText string
 
