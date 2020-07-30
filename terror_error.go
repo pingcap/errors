@@ -19,6 +19,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/pingcap/log"
+	"go.uber.org/zap"
 )
 
 // Error is the 'prototype' of a type of errors.
@@ -313,7 +316,6 @@ func Call(fn func() error) {
 // Log logs the error if it is not nil.
 func Log(err error) {
 	if err != nil {
-		log.Error("encountered error", zap.Error(errors.WithStack(err)))
+		log.Error("encountered error", zap.Error(WithStack(err)))
 	}
 }
-
