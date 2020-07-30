@@ -131,7 +131,7 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("[%s] %s", e.RFCCode(), e.getMsg())
 }
 
-func (e *Error) getMsg() string {
+func (e *Error) GetMsg() string {
 	if len(e.args) > 0 {
 		return fmt.Sprintf(e.message, e.args...)
 	}
