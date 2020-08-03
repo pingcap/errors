@@ -134,9 +134,6 @@ func (ec *ErrClass) DefineError() *Builder {
 // RegisterError try to register an error to a class.
 // return true if success.
 func (ec *ErrClass) RegisterError(err *Error) bool {
-	if _, ok := ec.errors[err.ID()]; ok {
-		return false
-	}
 	err.class = ec
 	ec.errors[err.ID()] = err
 	return true

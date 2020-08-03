@@ -19,6 +19,10 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/pingcap/log"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 // Error is the 'prototype' of a type of errors.
@@ -128,10 +132,10 @@ func (e *Error) Error() string {
 	if len(describe) == 0 {
 		describe = ErrCodeText(strconv.Itoa(int(e.code)))
 	}
-	return fmt.Sprintf("[%s] %s", e.RFCCode(), e.getMsg())
+	return fmt.Sprintf("[%s] %s", e.RFCCode(), e.GetMsg())
 }
 
-func (e *Error) getMsg() string {
+func (e *Error) GetMsg() string {
 	if len(e.args) > 0 {
 		return fmt.Sprintf(e.message, e.args...)
 	}
@@ -251,7 +255,7 @@ type jsonError struct {
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&jsonError{
-		Error:       e.getMsg(),
+		Error:       e.GetMsg(),
 		Description: e.Description,
 		Workaround:  e.Workaround,
 		RFCCode:     e.RFCCode(),
@@ -291,3 +295,29 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+// MustNil cleans up and fatals if err is not nil.
+func MustNil(err error, closeFuns ...func()) {
+	if err != nil {
+		for _, f := range closeFuns {
+			f()
+		}
+		log.Fatal("unexpected error", zap.Error(err))
+	}
+}
+
+// Call executes a function and checks the returned err.
+func Call(fn func() error) {
+	err := fn()
+	if err != nil {
+		log.Error("function call errored", zap.Error(err))
+	}
+}
+
+// Log logs the error if it is not nil.
+func Log(err error) {
+	if err != nil {
+		log.Error("encountered error", zap.Error(errors.WithStack(err)))
+	}
+}
+
