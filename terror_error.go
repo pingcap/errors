@@ -19,9 +19,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-
-	"github.com/pingcap/log"
-	"go.uber.org/zap"
 )
 
 // Error is the 'prototype' of a type of errors.
@@ -295,27 +292,3 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MustNil cleans up and fatals if err is not nil.
-func MustNil(err error, closeFuns ...func()) {
-	if err != nil {
-		for _, f := range closeFuns {
-			f()
-		}
-		log.Fatal("unexpected error", zap.Error(err))
-	}
-}
-
-// Call executes a function and checks the returned err.
-func Call(fn func() error) {
-	err := fn()
-	if err != nil {
-		log.Error("function call errored", zap.Error(err))
-	}
-}
-
-// Log logs the error if it is not nil.
-func Log(err error) {
-	if err != nil {
-		log.Error("encountered error", zap.Error(WithStack(err)))
-	}
-}
