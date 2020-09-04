@@ -166,8 +166,13 @@ func (*testTErrorSuite) TestWarpAndField(c *C) {
 func (*testTErrorSuite) TestMessageDefaultFormat(c *C) {
 	causeErr := errors.New("load from etcd meet error")
 	ErrGetLeader := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.MessageDefaultFormat())
+
 	errAnnotate := errors.Annotate(ErrGetLeader, causeErr.Error())
 	c.Assert(errAnnotate.Error(), Equals, "load from etcd meet error: [member:ErrGetLeader]fail to get leader")
+
 	errFastGenByArgs := ErrGetLeader.FastGenByArgs(causeErr.Error())
 	c.Assert(errFastGenByArgs.Error(), Equals, "[member:ErrGetLeader]fail to get leader: load from etcd meet error")
+
+	errFastGen := ErrGetLeader.FastGen("caused by: %s", causeErr.Error())
+	c.Assert(errFastGen.Error(), Equals, "[member:ErrGetLeader]caused by: load from etcd meet error")
 }

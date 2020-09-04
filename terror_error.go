@@ -154,6 +154,8 @@ func (e *Error) fillLineAndFile(skip int) {
 func (e *Error) GenWithStack(format string, args ...interface{}) error {
 	err := *e
 	err.message = format
+	// Always enable printf style message.
+	err.defaultFmt = false
 	err.args = args
 	err.fillLineAndFile(1)
 	return AddStack(&err)
@@ -172,6 +174,8 @@ func (e *Error) GenWithStackByArgs(args ...interface{}) error {
 func (e *Error) FastGen(format string, args ...interface{}) error {
 	err := *e
 	err.message = format
+	// Always enable printf style message.
+	err.defaultFmt = false
 	err.args = args
 	return SuspendStack(&err)
 }
