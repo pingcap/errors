@@ -61,7 +61,8 @@ type Error struct {
 	codeText ErrCodeText
 	// message is a template of the description of this error.
 	// printf-style formatting is enabled.
-	message string
+	message    string
+	defaultFmt bool
 	// The workaround field: how to work around this error.
 	// It's used to teach the users how to solve the error if occurring in the real environment.
 	workaround string
@@ -126,6 +127,12 @@ func (e *Error) Error() string {
 
 func (e *Error) GetMsg() string {
 	if len(e.args) > 0 {
+		if e.defaultFmt {
+			args := make([]interface{}, 0, 1+len(e.args))
+			args = append(args, e.message+": ")
+			args = append(args, e.args...)
+			return fmt.Sprint(args...)
+		}
 		return fmt.Sprintf(e.message, e.args...)
 	}
 	return e.message
@@ -337,6 +344,12 @@ func RFCCodeText(codeText string) NormalizeOption {
 func MySQLErrorCode(code int) NormalizeOption {
 	return func(e *Error) {
 		e.code = ErrCode(code)
+	}
+}
+
+func MessageDefaultFormat() NormalizeOption {
+	return func(e *Error) {
+		e.defaultFmt = true
 	}
 }
 
