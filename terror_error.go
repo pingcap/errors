@@ -241,13 +241,45 @@ type jsonError struct {
 // and the original global registry would be removed here.
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&jsonError{
-		Error:       e.GetMsg(),
-		Description: e.description,
-		Workaround:  e.workaround,
-		RFCCode:     e.RFCCode(),
-		Line:        e.line,
-		File:        e.file,
+	var rfcCodeToClass = map[string]int{
+		"autoid":     1,
+		"ddl":        2,
+		"domain":     3,
+		"evaluator":  4,
+		"executor":   5,
+		"expression": 6,
+		"admin":      7,
+		"kv":         8,
+		"meta":       9,
+		"planner":    10,
+		"parser":     11,
+		"perfschema": 12,
+		"privilege":  13,
+		"schema":     14,
+		"server":     15,
+		"struct":     16,
+		"variable":   17,
+		"xeval":      18,
+		"table":      19,
+		"types":      20,
+		"global":     21,
+		"mocktikv":   22,
+		"json":       23,
+		"tikv":       24,
+		"session":    25,
+		"plugin":     26,
+		"util":       27,
+	}
+	codes := strings.Split(string(e.codeText), ":")
+	class := codes[0]
+	return json.Marshal(&struct {
+		Class int    `json:"class"`
+		Code  int    `json:"code"`
+		Msg   string `json:"message"`
+	}{
+		Class: rfcCodeToClass[class],
+		Code:  int(e.code),
+		Msg:   e.GetMsg(),
 	})
 }
 
@@ -257,20 +289,49 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 // and the original global registry is removed.
 // This function is reserved for compatibility.
 func (e *Error) UnmarshalJSON(data []byte) error {
-	err := &jsonError{}
+	var class2rfcCode = map[int]string{
+		1:  "autoid",
+		2:  "ddl",
+		3:  "domain",
+		4:  "evaluator",
+		5:  "executor",
+		6:  "expression",
+		7:  "admin",
+		8:  "kv",
+		9:  "meta",
+		10: "planner",
+		11: "parser",
+		12: "perfschema",
+		13: "privilege",
+		14: "schema",
+		15: "server",
+		16: "struct",
+		17: "variable",
+		18: "xeval",
+		19: "table",
+		20: "types",
+		21: "global",
+		22: "mocktikv",
+		23: "json",
+		24: "tikv",
+		25: "session",
+		26: "plugin",
+		27: "util",
+	}
+
+	err := &struct {
+		Class int    `json:"class"`
+		Code  int    `json:"code"`
+		Msg   string `json:"message"`
+	}{}
 
 	if err := json.Unmarshal(data, &err); err != nil {
 		return Trace(err)
 	}
-	codes := strings.Split(string(err.RFCCode), ":")
-	innerCode := codes[len(codes)-1]
-	if i, errAtoi := strconv.Atoi(innerCode); errAtoi == nil {
-		e.code = ErrCode(i)
-	}
-	e.codeText = ErrCodeText(err.RFCCode)
-	e.line = err.Line
-	e.file = err.File
-	e.message = err.Error
+	class, _ := class2rfcCode[err.Class]
+	e.codeText = ErrCodeText(class + ":" + strconv.Itoa(err.Code))
+	e.code = ErrCode(err.Code)
+	e.message = err.Msg
 	return nil
 }
 
@@ -280,7 +341,7 @@ func (e *Error) Wrap(err error) *Error {
 		newErr.cause = err
 		return &newErr
 	}
-	return e
+	return nil
 }
 
 func (e *Error) Cause() error {
