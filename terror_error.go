@@ -287,12 +287,9 @@ func ErrorNotEqual(err1, err2 error) bool {
 }
 
 type jsonError struct {
-	RFCCode     RFCErrorCode `json:"code"`
-	Error       string       `json:"message"`
-	Description string       `json:"description,omitempty"`
-	Workaround  string       `json:"workaround,omitempty"`
-	File        string       `json:"file"`
-	Line        int          `json:"line"`
+	Class int    `json:"class"`
+	Code  int    `json:"code"`
+	Msg   string `json:"message"`
 }
 
 // MarshalJSON implements json.Marshaler interface.
@@ -303,11 +300,7 @@ type jsonError struct {
 func (e *Error) MarshalJSON() ([]byte, error) {
 	codes := strings.Split(string(e.codeText), ":")
 	class := codes[0]
-	return json.Marshal(&struct {
-		Class int    `json:"class"`
-		Code  int    `json:"code"`
-		Msg   string `json:"message"`
-	}{
+	return json.Marshal(&jsonError{
 		Class: rfcCodeToClass[class],
 		Code:  int(e.code),
 		Msg:   e.GetMsg(),
@@ -320,12 +313,7 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 // and the original global registry is removed.
 // This function is reserved for compatibility.
 func (e *Error) UnmarshalJSON(data []byte) error {
-	err := &struct {
-		Class int    `json:"class"`
-		Code  int    `json:"code"`
-		Msg   string `json:"message"`
-	}{}
-
+	err := &jsonError{}
 	if err := json.Unmarshal(data, &err); err != nil {
 		return Trace(err)
 	}
