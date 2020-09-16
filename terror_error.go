@@ -31,7 +31,7 @@ type ErrCodeText string
 type ErrorID string
 type RFCErrorCode string
 
-var class2rfcCode = map[int]string{
+var class2RFCCode = map[int]string{
 	1:  "autoid",
 	2:  "ddl",
 	3:  "domain",
@@ -61,12 +61,12 @@ var class2rfcCode = map[int]string{
 	27: "util",
 }
 
-var rfcCode2class map[string]int
+var RFCCode2class map[string]int
 
 func init() {
-	rfcCode2class = make(map[string]int)
-	for k, v := range class2rfcCode {
-		rfcCode2class[v] = k
+	RFCCode2class = make(map[string]int)
+	for k, v := range class2RFCCode {
+		RFCCode2class[v] = k
 	}
 }
 
@@ -269,7 +269,7 @@ type jsonError struct {
 	Class   int    `json:"class"`
 	Code    int    `json:"code"`
 	Msg     string `json:"message"`
-	RfcCode string `json:"rfccode"`
+	RFCCode string `json:"rfccode"`
 }
 
 // MarshalJSON implements json.Marshaler interface.
@@ -280,13 +280,13 @@ type jsonError struct {
 func (e *Error) MarshalJSON() ([]byte, error) {
 	class, ec := strings.Split(string(e.codeText), ":"), 0
 	if len(class) > 0 {
-		ec = rfcCode2class[class[0]]
+		ec = RFCCode2class[class[0]]
 	}
 	return json.Marshal(&jsonError{
 		Class:   ec,
 		Code:    int(e.code),
 		Msg:     e.GetMsg(),
-		RfcCode: string(e.codeText),
+		RFCCode: string(e.codeText),
 	})
 }
 
@@ -300,9 +300,9 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &tErr); err != nil {
 		return Trace(err)
 	}
-	e.codeText = ErrCodeText(tErr.RfcCode)
-	if tErr.RfcCode == "" && tErr.Class > 0 {
-		e.codeText = ErrCodeText(class2rfcCode[tErr.Class] + ":" + strconv.Itoa(tErr.Code))
+	e.codeText = ErrCodeText(tErr.RFCCode)
+	if tErr.RFCCode == "" && tErr.Class > 0 {
+		e.codeText = ErrCodeText(class2RFCCode[tErr.Class] + ":" + strconv.Itoa(tErr.Code))
 	}
 	e.code = ErrCode(tErr.Code)
 	e.message = tErr.Msg
