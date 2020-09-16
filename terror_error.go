@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
-	"strings"
 )
 
 // ErrCode represents a specific error type in a error class.
@@ -61,35 +60,7 @@ var class2rfcCode = map[int]string{
 	27: "util",
 }
 
-var rfcCodeToClass = map[string]int{
-	"autoid":     1,
-	"ddl":        2,
-	"domain":     3,
-	"evaluator":  4,
-	"executor":   5,
-	"expression": 6,
-	"admin":      7,
-	"kv":         8,
-	"meta":       9,
-	"planner":    10,
-	"parser":     11,
-	"perfschema": 12,
-	"privilege":  13,
-	"schema":     14,
-	"server":     15,
-	"struct":     16,
-	"variable":   17,
-	"xeval":      18,
-	"table":      19,
-	"types":      20,
-	"global":     21,
-	"mocktikv":   22,
-	"json":       23,
-	"tikv":       24,
-	"session":    25,
-	"plugin":     26,
-	"util":       27,
-}
+const defaultClass = 2
 
 // Error is the 'prototype' of a type of errors.
 // Use DefineError to make a *Error:
@@ -287,9 +258,10 @@ func ErrorNotEqual(err1, err2 error) bool {
 }
 
 type jsonError struct {
-	Class int    `json:"class"`
-	Code  int    `json:"code"`
-	Msg   string `json:"message"`
+	Class   int    `json:"class"`
+	Code    int    `json:"code"`
+	Msg     string `json:"message"`
+	RfcCode string `json:"rfccode"`
 }
 
 // MarshalJSON implements json.Marshaler interface.
@@ -298,12 +270,11 @@ type jsonError struct {
 // and the original global registry would be removed here.
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
-	codes := strings.Split(string(e.codeText), ":")
-	class := codes[0]
 	return json.Marshal(&jsonError{
-		Class: rfcCodeToClass[class],
-		Code:  int(e.code),
-		Msg:   e.GetMsg(),
+		Class:   defaultClass,
+		Code:    int(e.code),
+		Msg:     e.GetMsg(),
+		RfcCode: string(e.codeText),
 	})
 }
 
@@ -313,14 +284,16 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 // and the original global registry is removed.
 // This function is reserved for compatibility.
 func (e *Error) UnmarshalJSON(data []byte) error {
-	err := &jsonError{}
-	if err := json.Unmarshal(data, &err); err != nil {
+	tErr := &jsonError{}
+	if err := json.Unmarshal(data, &tErr); err != nil {
 		return Trace(err)
 	}
-	class, _ := class2rfcCode[err.Class]
-	e.codeText = ErrCodeText(class + ":" + strconv.Itoa(err.Code))
-	e.code = ErrCode(err.Code)
-	e.message = err.Msg
+	e.codeText = ErrCodeText(tErr.RfcCode)
+	if tErr.RfcCode == "" {
+		e.codeText = ErrCodeText(class2rfcCode[tErr.Class] + ":" + strconv.Itoa(tErr.Code))
+	}
+	e.code = ErrCode(tErr.Code)
+	e.message = tErr.Msg
 	return nil
 }
 
