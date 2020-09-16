@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"strings"
 )
 
 // ErrCode represents a specific error type in a error class.
@@ -60,7 +61,14 @@ var class2rfcCode = map[int]string{
 	27: "util",
 }
 
-const defaultClass = 2
+var rfcCode2class map[string]int
+
+func init() {
+	rfcCode2class = make(map[string]int)
+	for k, v := range class2rfcCode {
+		rfcCode2class[v] = k
+	}
+}
 
 // Error is the 'prototype' of a type of errors.
 // Use DefineError to make a *Error:
@@ -270,8 +278,12 @@ type jsonError struct {
 // and the original global registry would be removed here.
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
+	class, ec := strings.Split(string(e.codeText), ":"), 0
+	if len(class) > 0 {
+		ec = rfcCode2class[class[0]]
+	}
 	return json.Marshal(&jsonError{
-		Class:   defaultClass,
+		Class:   ec,
 		Code:    int(e.code),
 		Msg:     e.GetMsg(),
 		RfcCode: string(e.codeText),
@@ -289,7 +301,7 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 		return Trace(err)
 	}
 	e.codeText = ErrCodeText(tErr.RfcCode)
-	if tErr.RfcCode == "" {
+	if tErr.RfcCode == "" && tErr.Class > 0 {
 		e.codeText = ErrCodeText(class2rfcCode[tErr.Class] + ":" + strconv.Itoa(tErr.Code))
 	}
 	e.code = ErrCode(tErr.Code)
