@@ -61,12 +61,12 @@ var class2RFCCode = map[int]string{
 	27: "util",
 }
 
-var RFCCode2class map[string]int
+var rfcCode2class map[string]int
 
 func init() {
-	RFCCode2class = make(map[string]int)
+	rfcCode2class = make(map[string]int)
 	for k, v := range class2RFCCode {
-		RFCCode2class[v] = k
+		rfcCode2class[v] = k
 	}
 }
 
@@ -280,7 +280,7 @@ type jsonError struct {
 func (e *Error) MarshalJSON() ([]byte, error) {
 	class, ec := strings.Split(string(e.codeText), ":"), 0
 	if len(class) > 0 {
-		ec = RFCCode2class[class[0]]
+		ec = rfcCode2class[class[0]]
 	}
 	return json.Marshal(&jsonError{
 		Class:   ec,
