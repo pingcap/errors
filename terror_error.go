@@ -31,7 +31,6 @@ type ErrCodeText string
 type ErrorID string
 type RFCErrorCode string
 
-
 // class2RFCCode is used for compatible with old version of TiDB. When
 // marshal Error to json, old version of TiDB contain a 'class' field
 // which is represented for error class. In order to parser and convert
