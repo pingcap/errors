@@ -31,6 +31,13 @@ type ErrCodeText string
 type ErrorID string
 type RFCErrorCode string
 
+
+// class2RFCCode is used for compatible with old version of TiDB. When
+// marshal Error to json, old version of TiDB contain a 'class' field
+// which is represented for error class. In order to parser and convert
+// json to errors.Error, using this map to convert error class to RFC
+// error code text. here is reference:
+// https://github.com/pingcap/parser/blob/release-3.0/terror/terror.go#L58
 var class2RFCCode = map[int]string{
 	1:  "autoid",
 	2:  "ddl",
@@ -60,7 +67,6 @@ var class2RFCCode = map[int]string{
 	26: "plugin",
 	27: "util",
 }
-
 var rfcCode2class map[string]int
 
 func init() {
@@ -266,6 +272,7 @@ func ErrorNotEqual(err1, err2 error) bool {
 }
 
 type jsonError struct {
+	// Deprecated field, please use `RFCCode` instead.
 	Class   int    `json:"class"`
 	Code    int    `json:"code"`
 	Msg     string `json:"message"`
@@ -278,12 +285,9 @@ type jsonError struct {
 // and the original global registry would be removed here.
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
-	class, ec := strings.Split(string(e.codeText), ":"), 0
-	if len(class) > 0 {
-		ec = rfcCode2class[class[0]]
-	}
+	ec := strings.Split(string(e.codeText), ":")[0]
 	return json.Marshal(&jsonError{
-		Class:   ec,
+		Class:   rfcCode2class[ec],
 		Code:    int(e.code),
 		Msg:     e.GetMsg(),
 		RFCCode: string(e.codeText),
