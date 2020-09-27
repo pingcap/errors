@@ -21,6 +21,9 @@ import (
 	"strings"
 )
 
+// RedactLogEnabled defines whether the arguments of Error need to be redacted.
+var RedactLogEnabled bool = false
+
 // ErrCode represents a specific error type in a error class.
 // Same error code can be used in different error classes.
 type ErrCode int
@@ -109,11 +112,16 @@ type Error struct {
 	// The workaround field: how to work around this error.
 	// It's used to teach the users how to solve the error if occurring in the real environment.
 	workaround string
-	// Description is the expanded detail of why this error occurred.
+	// description is the expanded detail of why this error occurred.
 	// This could be written by developer at a static env,
 	// and the more detail this field explaining the better,
 	// even some guess of the cause could be included.
 	description string
+	// redactArgsPos defines the positions of arguments in message that need to be redacted.
+	// And it is controlled by the global var RedactLogEnabled.
+	// For example, an original error is `Duplicate entry 'PRIMARY' for key 'key'`,
+	// when RedactLogEnabled is ON and redactArgsPos is [0, 1], the error is `Duplicate entry '?' for key '?'`.
+	redactArgsPos []int
 	// Cause is used to warp some third party error.
 	cause error
 	args  []interface{}
@@ -189,6 +197,7 @@ func (e *Error) fillLineAndFile(skip int) {
 
 // GenWithStack generates a new *Error with the same class and code, and a new formatted message.
 func (e *Error) GenWithStack(format string, args ...interface{}) error {
+	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
 	err.args = args
@@ -198,6 +207,7 @@ func (e *Error) GenWithStack(format string, args ...interface{}) error {
 
 // GenWithStackByArgs generates a new *Error with the same class and code, and new arguments.
 func (e *Error) GenWithStackByArgs(args ...interface{}) error {
+	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
 	err.args = args
 	err.fillLineAndFile(1)
@@ -207,6 +217,7 @@ func (e *Error) GenWithStackByArgs(args ...interface{}) error {
 // FastGen generates a new *Error with the same class and code, and a new formatted message.
 // This will not call runtime.Caller to get file and line.
 func (e *Error) FastGen(format string, args ...interface{}) error {
+	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
 	err.args = args
@@ -216,6 +227,7 @@ func (e *Error) FastGen(format string, args ...interface{}) error {
 // FastGen generates a new *Error with the same class and code, and a new arguments.
 // This will not call runtime.Caller to get file and line.
 func (e *Error) FastGenByArgs(args ...interface{}) error {
+	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
 	err.args = args
 	return SuspendStack(&err)
@@ -241,6 +253,17 @@ func (e *Error) Equal(err error) bool {
 // NotEqual checks if err is not equal to e.
 func (e *Error) NotEqual(err error) bool {
 	return !e.Equal(err)
+}
+
+// RedactErrorArg redacts the args by position if RedactLogEnabled is enabled.
+func RedactErrorArg(args []interface{}, position []int) {
+	if RedactLogEnabled {
+		for _, pos := range position {
+			if len(args) > pos {
+				args[pos] = "?"
+			}
+		}
+	}
 }
 
 // ErrorEqual returns a boolean indicating whether err1 is equal to err2.
@@ -361,6 +384,12 @@ func Description(desc string) NormalizeOption {
 func Workaround(wr string) NormalizeOption {
 	return func(e *Error) {
 		e.workaround = wr
+	}
+}
+
+func RedactArgs(pos []int) NormalizeOption {
+	return func(e *Error) {
+		e.redactArgsPos = pos
 	}
 }
 
