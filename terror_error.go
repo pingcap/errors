@@ -14,11 +14,9 @@
 package errors
 
 import (
-	"encoding/json"
 	"fmt"
 	"runtime"
 	"strconv"
-	"strings"
 )
 
 // ErrCode represents a specific error type in a error class.
@@ -268,48 +266,6 @@ func ErrorEqual(err1, err2 error) bool {
 // ErrorNotEqual returns a boolean indicating whether err1 isn't equal to err2.
 func ErrorNotEqual(err1, err2 error) bool {
 	return !ErrorEqual(err1, err2)
-}
-
-type jsonError struct {
-	// Deprecated field, please use `RFCCode` instead.
-	Class   int    `json:"class"`
-	Code    int    `json:"code"`
-	Msg     string `json:"message"`
-	RFCCode string `json:"rfccode"`
-}
-
-// MarshalJSON implements json.Marshaler interface.
-// aware that this function cannot save a 'registered' status,
-// since we cannot access the registry when unmarshaling,
-// and the original global registry would be removed here.
-// This function is reserved for compatibility.
-func (e *Error) MarshalJSON() ([]byte, error) {
-	ec := strings.Split(string(e.codeText), ":")[0]
-	return json.Marshal(&jsonError{
-		Class:   rfcCode2class[ec],
-		Code:    int(e.code),
-		Msg:     e.GetMsg(),
-		RFCCode: string(e.codeText),
-	})
-}
-
-// UnmarshalJSON implements json.Unmarshaler interface.
-// aware that this function cannot create a 'registered' error,
-// since we cannot access the registry in this context,
-// and the original global registry is removed.
-// This function is reserved for compatibility.
-func (e *Error) UnmarshalJSON(data []byte) error {
-	tErr := &jsonError{}
-	if err := json.Unmarshal(data, &tErr); err != nil {
-		return Trace(err)
-	}
-	e.codeText = ErrCodeText(tErr.RFCCode)
-	if tErr.RFCCode == "" && tErr.Class > 0 {
-		e.codeText = ErrCodeText(class2RFCCode[tErr.Class] + ":" + strconv.Itoa(tErr.Code))
-	}
-	e.code = ErrCode(tErr.Code)
-	e.message = tErr.Msg
-	return nil
 }
 
 func (e *Error) Wrap(err error) *Error {

@@ -163,3 +163,42 @@ func (*testTErrorSuite) TestWarpAndField(c *C) {
 	errWithWarpedCause := errors.Annotate(ErrGetLeader, causeErr.Error())
 	c.Assert(errWithWarpedCause.Error(), Equals, "load from etcd meet error: [member:ErrGetLeader]fail to get leader")
 }
+
+func (*testTErrorSuite) TestErrorJSON(c *C) {
+	err := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.Workaround("foo"), errors.Description("bar"))
+	b, e := json.Marshal(&err)
+	c.Assert(e, IsNil)
+	c.Assert(string(b), Equals, `{"class":0,"code":0,"message":"fail to get leader","rfccode":"member:ErrGetLeader","description":"bar","workaround":"foo"}`)
+	err1 := errors.Error{}
+	e = json.Unmarshal(b, &err1)
+	c.Assert(e, IsNil)
+	c.Assert(*err, DeepEquals, err1, Commentf("%s %v", b, err))
+}
+
+func (*testTErrorSuite) TestRenderJSON(c *C) {
+	err := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.Workaround("foo"), errors.Description("bar"))
+	render := errors.RenderJSON(*err)
+	b, e := json.Marshal(render)
+	c.Assert(e, IsNil)
+	c.Assert(string(b), Equals, `{"class":0,"code":0,"message":"fail to get leader","rfccode":"member:ErrGetLeader","description":"bar","workaround":"foo"}`)
+	render1 := errors.RenderJSON{}
+	e = json.Unmarshal(b, &render1)
+	c.Assert(e, IsNil)
+	c.Assert(*err, DeepEquals, errors.Error(render1), Commentf("%s %v", b, render))
+}
+
+func (*testTErrorSuite) TestRenderTOML(c *C) {
+	err := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.Workaround("foo"), errors.Description("bar"))
+	render := errors.RenderTOML(*err)
+	b, e := render.MarshalText()
+	c.Assert(e, IsNil)
+	c.Assert(string(b), Equals, `message = "fail to get leader"
+code = "member:ErrGetLeader"
+description = "bar"
+workaround = "foo"
+`)
+	render1 := errors.RenderTOML{}
+	e = render1.UnmarshalText(b)
+	c.Assert(e, IsNil)
+	c.Assert(*err, DeepEquals, errors.Error(render1), Commentf("%s %v", b, render))
+}
