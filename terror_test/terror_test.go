@@ -168,11 +168,12 @@ func (*testTErrorSuite) TestErrorJSON(c *C) {
 	err := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.Workaround("foo"), errors.Description("bar"))
 	b, e := json.Marshal(&err)
 	c.Assert(e, IsNil)
-	c.Assert(string(b), Equals, `{"class":0,"code":0,"message":"fail to get leader","rfccode":"member:ErrGetLeader","description":"bar","workaround":"foo"}`)
+	c.Assert(string(b), Equals, `{"class":0,"code":0,"message":"fail to get leader","rfccode":"member:ErrGetLeader"}`)
 	err1 := errors.Error{}
 	e = json.Unmarshal(b, &err1)
 	c.Assert(e, IsNil)
-	c.Assert(*err, DeepEquals, err1, Commentf("%s %v", b, err))
+	// err1 does not have workaround and description
+	c.Assert(*errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader")), DeepEquals, err1, Commentf("%s %v", b, err))
 }
 
 func (*testTErrorSuite) TestRenderJSON(c *C) {

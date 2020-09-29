@@ -120,7 +120,11 @@ func (rd *RenderJSON) UnmarshalJSON(data []byte) error {
 // and the original global registry would be removed here.
 // This function is reserved for compatibility.
 func (e *Error) MarshalJSON() ([]byte, error) {
-	return json.Marshal((*RenderJSON)(e))
+	render := RenderJSON(*e)
+	// Do not output workaround and description via Error.MarshalJSON.
+	render.workaround = ""
+	render.description = ""
+	return json.Marshal(render)
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface.
@@ -130,5 +134,12 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 // This function is reserved for compatibility.
 func (e *Error) UnmarshalJSON(data []byte) error {
 	rd := (*RenderJSON)(e)
-	return rd.UnmarshalJSON(data)
+	err := rd.UnmarshalJSON(data)
+	if err != nil {
+		return err
+	}
+	// Do not fill workaround and description via Error.UnmarshalJSON.
+	e.workaround = ""
+	e.description = ""
+	return nil
 }
