@@ -14,6 +14,7 @@
 package terror_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"runtime"
@@ -21,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
 )
@@ -182,24 +184,22 @@ func (*testTErrorSuite) TestRenderJSON(c *C) {
 	b, e := json.Marshal(render)
 	c.Assert(e, IsNil)
 	c.Assert(string(b), Equals, `{"class":0,"code":0,"message":"fail to get leader","rfccode":"member:ErrGetLeader","description":"bar","workaround":"foo"}`)
-	render1 := errors.RenderJSON{}
+	render1 := errors.RenderJSON(errors.Error{})
 	e = json.Unmarshal(b, &render1)
 	c.Assert(e, IsNil)
-	c.Assert(*err, DeepEquals, errors.Error(render1), Commentf("%s %v", b, render))
+	c.Assert(render, DeepEquals, render1, Commentf("%s %v", b, render))
 }
 
 func (*testTErrorSuite) TestRenderTOML(c *C) {
 	err := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.Workaround("foo"), errors.Description("bar"))
 	render := errors.RenderTOML(*err)
-	b, e := render.MarshalText()
+	bf := new(bytes.Buffer)
+	encoder := toml.NewEncoder(bf)
+	e := encoder.Encode(render)
 	c.Assert(e, IsNil)
-	c.Assert(string(b), Equals, `message = "fail to get leader"
+	c.Assert(bf.String(), Equals, `error = "fail to get leader"
 code = "member:ErrGetLeader"
 description = "bar"
 workaround = "foo"
 `)
-	render1 := errors.RenderTOML{}
-	e = render1.UnmarshalText(b)
-	c.Assert(e, IsNil)
-	c.Assert(*err, DeepEquals, errors.Error(render1), Commentf("%s %v", b, render))
 }
