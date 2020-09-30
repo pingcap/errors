@@ -40,19 +40,6 @@ func RenderTOML(e Error) interface{} {
 	}
 }
 
-// RenderJSON implements MarshaJSON and UnmarshaJSON for Error.
-func RenderJSON(e Error) interface{} {
-	ec := strings.Split(string(e.codeText), ":")[0]
-	return &errorRender{
-		Class:       rfcCode2class[ec],
-		Code:        int(e.code),
-		Msg:         e.GetMsg(),
-		RFCCode:     string(e.codeText),
-		Description: e.description,
-		Workaround:  e.workaround,
-	}
-}
-
 // MarshalJSON implements json.Marshaler interface.
 // aware that this function cannot save a 'registered' status,
 // since we cannot access the registry when unmarshaling,

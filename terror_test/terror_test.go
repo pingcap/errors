@@ -178,18 +178,6 @@ func (*testTErrorSuite) TestErrorJSON(c *C) {
 	c.Assert(*errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader")), DeepEquals, err1, Commentf("%s %v", b, err))
 }
 
-func (*testTErrorSuite) TestRenderJSON(c *C) {
-	err := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.Workaround("foo"), errors.Description("bar"))
-	render := errors.RenderJSON(*err)
-	b, e := json.Marshal(render)
-	c.Assert(e, IsNil)
-	c.Assert(string(b), Equals, `{"class":0,"code":0,"message":"fail to get leader","rfccode":"member:ErrGetLeader","description":"bar","workaround":"foo"}`)
-	render1 := errors.RenderJSON(errors.Error{})
-	e = json.Unmarshal(b, &render1)
-	c.Assert(e, IsNil)
-	c.Assert(render, DeepEquals, render1, Commentf("%s %v", b, render))
-}
-
 func (*testTErrorSuite) TestRenderTOML(c *C) {
 	err := errors.Normalize("fail to get leader", errors.RFCCodeText("member:ErrGetLeader"), errors.Workaround("foo"), errors.Description("bar"))
 	render := errors.RenderTOML(*err)
