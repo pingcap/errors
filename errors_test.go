@@ -369,3 +369,71 @@ func TestWalkDeep(t *testing.T) {
 		t.Errorf("found not exists")
 	}
 }
+
+type fooError int
+
+func (fooError) Error() string {
+	return "foo"
+}
+
+func TestWorkWithStdErrors(t *testing.T) {
+	e1 := fooError(100)
+	e2 := Normalize("e2", RFCCodeText("e2"))
+	e3 := Normalize("e3", RFCCodeText("e3"))
+	e21 := e2.Wrap(e1)
+	e31 := e3.Wrap(e1)
+	e32 := e3.Wrap(e2)
+	e321 := e3.Wrap(e21)
+
+	unwrapTbl := []struct {
+		x *Error // x.Unwrap() == y
+		y error
+	}{{e2, nil}, {e3, nil}, {e21, e1}, {e31, e1}, {e32, e2}, {e321, e21}}
+	for _, c := range unwrapTbl {
+		if c.x.Unwrap() != c.y {
+			t.Errorf("`%s`.Unwrap() != `%s`", c.x, c.y)
+		}
+	}
+
+	isTbl := []struct {
+		x, y error // errors.Is(x, y) == b
+		b    bool
+	}{
+		{e1, e1, true}, {e2, e1, false}, {e3, e1, false}, {e21, e1, true}, {e321, e1, true},
+		{e1, e2, false}, {e2, e2, true}, {e3, e2, false}, {e21, e2, true}, {e31, e2, false}, {e321, e2, true},
+		{e2, e21, true}, {e21, e21, true}, {e31, e21, false}, {e321, e21, true},
+		{e321, e321, true}, {e3, e321, true}, {e21, e321, false},
+	}
+	for _, c := range isTbl {
+		if c.b && !errors.Is(c.x, c.y) {
+			t.Errorf("`%s` is not `%s`", c.x, c.y)
+		}
+		if !c.b && errors.Is(c.x, c.y) {
+			t.Errorf("`%s` is `%s`", c.x, c.y)
+		}
+	}
+
+	var e1x fooError
+	if ok := errors.As(e21, &e1x); !ok {
+		t.Error("e21 cannot convert to e1")
+	}
+	if int(e1x) != 100 {
+		t.Error("e1x is not 100")
+	}
+
+	var e2x *Error
+	if ok := errors.As(e21, &e2x); !ok {
+		t.Error("e21 cannot convert to e2")
+	}
+	if e2x.ID() != "e2" {
+		t.Error("err is not e2")
+	}
+
+	e3x := e3.Wrap(e1)
+	if ok := errors.As(e21, &e3x); !ok {
+		t.Error("e21 cannot convert to e3")
+	}
+	if e3x.ID() != "e2" {
+		t.Error("err is not e2")
+	}
+}
