@@ -272,7 +272,7 @@ func (e *Error) Is(other error) bool {
 	if !ok {
 		return false
 	}
-	return (e == nil && err == nil) || e.ID() == err.ID()
+	return (e == nil && err == nil) || (e != nil && err != nil && e.ID() == err.ID())
 }
 
 func (e *Error) Cause() error {
