@@ -270,6 +270,9 @@ func (w *withMessage) Cause() error  { return w.cause }
 func (w *withMessage) Unwrap() error  { return w.cause }
 func (w *withMessage) HasStack() bool { return w.causeHasStack }
 
+// Unwrap provides compatibility for Go 1.13 error chains.
+func (w *withMessage) Unwrap() error { return w.cause }
+
 func (w *withMessage) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
