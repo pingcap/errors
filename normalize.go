@@ -106,6 +106,11 @@ func (e *Error) MessageTemplate() string {
 	return e.message
 }
 
+// Args returns the message arguments of this error.
+func (e *Error) Args() []interface{} {
+	return e.args
+}
+
 // Error implements error interface.
 func (e *Error) Error() string {
 	if e == nil {
