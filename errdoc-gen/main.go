@@ -188,7 +188,7 @@ func main() {
 		}
 		buffer.WriteString("\n")
 	}
-	if err := ioutil.WriteFile(outpath, buffer.Bytes(), os.ModePerm); err != nil {
+	if err := ioutil.WriteFile(outpath, buffer.Bytes(), 0644); err != nil {
 		panic(err)
 	}
 }
@@ -205,7 +205,7 @@ func main() {
 	}
 
 	outFile := filepath.Join(targetDir, entryFileName)
-	out, err := os.OpenFile(outFile, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	out, err := os.OpenFile(outFile, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		fatal("Open %s failed: %+v", outFile, err)
 	}
