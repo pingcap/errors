@@ -299,6 +299,16 @@ func TestNewNoStackError(t *testing.T) {
 	}
 }
 
+func TestNewNoStackErrorf(t *testing.T) {
+	err := NewNoStackErrorf("test error %s", "yes")
+	err = Trace(err)
+	err = Trace(err)
+	result := fmt.Sprintf("%+v", err)
+	if result != "test error yes" {
+		t.Errorf("NewNoStackError(): want %s, got %v", "test error", result)
+	}
+}
+
 func TestSuspendError(t *testing.T) {
 	err := io.EOF
 	err = SuspendStack(err)
