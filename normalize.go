@@ -21,8 +21,16 @@ import (
 	"go.uber.org/atomic"
 )
 
+var _ fmt.Formatter = (*redactFormatter)(nil)
+
 // RedactLogEnabled defines whether the arguments of Error need to be redacted.
-var RedactLogEnabled atomic.Bool
+var RedactLogEnabled atomic.String
+
+const (
+	RedactLogEnable  string = "ON"
+	RedactLogDisable        = "OFF"
+	RedactLogMarker         = "MARKER"
+)
 
 // ErrCode represents a specific error type in a error class.
 // Same error code can be used in different error classes.
@@ -63,6 +71,7 @@ type Error struct {
 	// And it is controlled by the global var RedactLogEnabled.
 	// For example, an original error is `Duplicate entry 'PRIMARY' for key 'key'`,
 	// when RedactLogEnabled is ON and redactArgsPos is [0, 1], the error is `Duplicate entry '?' for key '?'`.
+	// when RedactLogEnabled is MARKER and redactArgsPos is [0, 1], the error is `Duplicate entry '‹..›' for key '‹..›'`.
 	redactArgsPos []int
 	// Cause is used to warp some third party error.
 	cause error
@@ -207,10 +216,17 @@ func (e *Error) NotEqual(err error) bool {
 
 // RedactErrorArg redacts the args by position if RedactLogEnabled is enabled.
 func RedactErrorArg(args []interface{}, position []int) {
-	if RedactLogEnabled.Load() {
+	switch RedactLogEnabled.Load() {
+	case RedactLogEnable:
 		for _, pos := range position {
 			if len(args) > pos {
 				args[pos] = "?"
+			}
+		}
+	case RedactLogMarker:
+		for _, pos := range position {
+			if len(args) > pos {
+				args[pos] = &redactFormatter{args[pos]}
 			}
 		}
 	}
@@ -338,4 +354,13 @@ func Normalize(message string, opts ...NormalizeOption) *Error {
 		opt(e)
 	}
 	return e
+}
+
+type redactFormatter struct {
+	arg interface{}
+}
+
+func (e *redactFormatter) Format(f fmt.State, verb rune) {
+
+	fmt.Fprintf(f, fmt.Sprintf("‹%s›", fmt.FormatString(f, verb)) , e.arg)
 }
