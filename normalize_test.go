@@ -43,4 +43,9 @@ func TestRedactFormatter(t *testing.T) {
 			t.Errorf("%s != %s", a, b)
 		}
 	}
+
+	v = &redactFormatter{"‹"}
+	if a := fmt.Sprintf("%s", v); a != "‹‹‹›" {
+		t.Errorf("%s != <<<>", a)
+	}
 }

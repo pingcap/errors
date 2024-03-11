@@ -47,19 +47,21 @@ type RFCErrorCode string
 // var ErrUnavailable = errors.Normalize("Region %d is unavailable", errors.RFCCodeText("Unavailable"))
 //
 // "throw" it at runtime:
-// func Somewhat() error {
-//     ...
-//     if err != nil {
-//         // generate a stackful error use the message template at defining,
-//         // also see FastGen(it's stackless), GenWithStack(it uses custom message template).
-//         return ErrUnavailable.GenWithStackByArgs(region.ID)
-//     }
-// }
+//
+//	func Somewhat() error {
+//	    ...
+//	    if err != nil {
+//	        // generate a stackful error use the message template at defining,
+//	        // also see FastGen(it's stackless), GenWithStack(it uses custom message template).
+//	        return ErrUnavailable.GenWithStackByArgs(region.ID)
+//	    }
+//	}
 //
 // testing whether an error belongs to a prototype:
-// if ErrUnavailable.Equal(err) {
-//     // handle this error.
-// }
+//
+//	if ErrUnavailable.Equal(err) {
+//	    // handle this error.
+//	}
 type Error struct {
 	code ErrCode
 	// codeText is the textual describe of the error code
@@ -361,6 +363,15 @@ type redactFormatter struct {
 }
 
 func (e *redactFormatter) Format(f fmt.State, verb rune) {
-
-	fmt.Fprintf(f, fmt.Sprintf("‹%s›", fmt.FormatString(f, verb)) , e.arg)
+	origin := fmt.Sprintf(fmt.FormatString(f, verb), e.arg)
+	fmt.Fprintf(f, "‹")
+	for _, c := range origin {
+		if c == '‹' || c == '›' {
+			fmt.Fprintf(f, "%c", c)
+			fmt.Fprintf(f, "%c", c)
+		} else {
+			fmt.Fprintf(f, "%c", c)
+		}
+	}
+	fmt.Fprintf(f, "›")
 }
