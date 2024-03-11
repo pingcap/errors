@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 )
@@ -30,4 +31,21 @@ func TestCauseInErrorMessage(t *testing.T) {
 
 	notWrapped := errTest.GenWithStack("everything is alright")
 	errorMatches(t, notWrapped, `^\[Internal:Test\]everything is alright$`)
+}
+
+func TestRedactFormatter(t *testing.T) {
+	rv := 34.03498
+	v := &redactFormatter{rv}
+	for _, f := range []string{"%d", "%.2d"} {
+		a := fmt.Sprintf(f, v)
+		b := fmt.Sprintf("‹"+f+"›", rv)
+		if a != b {
+			t.Errorf("%s != %s", a, b)
+		}
+	}
+
+	v = &redactFormatter{"‹"}
+	if a := fmt.Sprintf("%s", v); a != "‹‹‹›" {
+		t.Errorf("%s != <<<>", a)
+	}
 }
