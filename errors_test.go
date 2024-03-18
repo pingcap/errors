@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -436,4 +438,13 @@ func TestWorkWithStdErrors(t *testing.T) {
 	if e3x.ID() != "e2" {
 		t.Error("err is not e2")
 	}
+}
+
+func TestHasTrace(t *testing.T) {
+	targetErr := Normalize("test err")
+	require.False(t, HasStack(targetErr))
+	require.False(t, HasStack(targetErr.FastGen("fast gen")))
+	require.False(t, HasStack(targetErr.FastGenByArgs("fast gen arg")))
+	require.True(t, HasStack(Trace(targetErr.FastGen("fast gen"))))
+	require.True(t, HasStack(targetErr.GenWithStack("gen")))
 }
