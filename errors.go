@@ -172,10 +172,14 @@ func WithStack(err error) error {
 // AddStack is similar to WithStack.
 // However, it will first check with HasStack to see if a stack trace already exists in the causer chain before creating another one.
 func AddStack(err error) error {
-	if HasStack(err) {
+	if err == nil  || HasStack(err) {
 		return err
 	}
-	return WithStack(err)
+
+	return &withStack{
+		err,
+		callers(),
+	}
 }
 
 type withStack struct {
