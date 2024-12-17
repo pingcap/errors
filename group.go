@@ -21,12 +21,16 @@ func Errors(err error) []error {
 // In that case, WalkDeep will return true, otherwise false.
 func WalkDeep(err error, visitor func(err error) bool) bool {
 	// Go deep
-	unErr := err
-	for unErr != nil {
-		if done := visitor(unErr); done {
+
+	if visitor(err) {
+		return true
+	}
+
+	unErr := Unwrap(err)
+	if unErr != nil {
+		if WalkDeep(unErr, visitor) {
 			return true
 		}
-		unErr = Unwrap(unErr)
 	}
 
 	// Go wide

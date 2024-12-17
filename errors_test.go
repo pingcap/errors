@@ -372,6 +372,49 @@ func TestWalkDeep(t *testing.T) {
 	}
 }
 
+func TestWalkDeepComplexTree(t *testing.T) {
+	err := &errWalkTest{v: 1, cause: &errWalkTest{
+		sub: []error{
+			&errWalkTest{
+				v:     10,
+				cause: &errWalkTest{v: 11},
+			},
+			&errWalkTest{
+				v: 20,
+				sub: []error{
+					&errWalkTest{v: 21},
+					&errWalkTest{v: 22},
+				},
+			},
+			&errWalkTest{
+				v:     30,
+				cause: &errWalkTest{v: 31},
+			},
+		},
+	}}
+
+	assertFind := func(v int, comment string) {
+		if !testFind(err, v) {
+			t.Errorf("%d not found in the error: %s", v, comment)
+		}
+	}
+	assertNotFind := func(v int, comment string) {
+		if testFind(err, v) {
+			t.Errorf("%d found in the error, but not expected: %s", v, comment)
+		}
+	}
+
+	assertFind(1, "shallow search")
+	assertFind(11, "deep search A1")
+	assertFind(21, "deep search A2")
+	assertFind(22, "deep search B1")
+	assertNotFind(23, "deep search Neg")
+	assertFind(31, "deep search B2")
+	assertNotFind(32, "deep search Neg")
+	assertFind(30, "Tree node A")
+	assertFind(20, "Tree node with many children")
+}
+
 type fooError int
 
 func (fooError) Error() string {
