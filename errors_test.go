@@ -372,6 +372,10 @@ func TestWalkDeep(t *testing.T) {
 	}
 }
 
+func TestWalkDeepNil(t *testing.T) {
+	require.False(t, WalkDeep(nil, func(err error) bool { return true }))
+}
+
 func TestWalkDeepComplexTree(t *testing.T) {
 	err := &errWalkTest{v: 1, cause: &errWalkTest{
 		sub: []error{
