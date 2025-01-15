@@ -17,16 +17,15 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
-
-	"go.uber.org/atomic"
+	"sync/atomic"
 )
 
 var _ fmt.Formatter = (*redactFormatter)(nil)
 
 // RedactLogEnabled defines whether the arguments of Error need to be redacted.
-var RedactLogEnabled atomic.String
+var RedactLogEnabled atomic.Pointer[string]
 
-const (
+var (
 	RedactLogEnable  string = "ON"
 	RedactLogDisable        = "OFF"
 	RedactLogMarker         = "MARKER"
@@ -218,7 +217,11 @@ func (e *Error) NotEqual(err error) bool {
 
 // RedactErrorArg redacts the args by position if RedactLogEnabled is enabled.
 func RedactErrorArg(args []interface{}, position []int) {
-	switch RedactLogEnabled.Load() {
+	redactLogEnabled := RedactLogEnabled.Load()
+	if redactLogEnabled == nil {
+		return
+	}
+	switch *redactLogEnabled {
 	case RedactLogEnable:
 		for _, pos := range position {
 			if len(args) > pos {
