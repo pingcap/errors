@@ -17,6 +17,19 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+
+	"go.uber.org/atomic"
+)
+
+var _ fmt.Formatter = (*redactFormatter)(nil)
+
+// RedactLogEnabled defines whether the arguments of Error need to be redacted.
+var RedactLogEnabled atomic.String
+
+const (
+	RedactLogEnable  string = "ON"
+	RedactLogDisable        = "OFF"
+	RedactLogMarker         = "MARKER"
 )
 
 // ErrCode represents a specific error type in a error class.
@@ -203,6 +216,24 @@ func (e *Error) NotEqual(err error) bool {
 	return !e.Equal(err)
 }
 
+// RedactErrorArg redacts the args by position if RedactLogEnabled is enabled.
+func RedactErrorArg(args []interface{}, position []int) {
+	switch RedactLogEnabled.Load() {
+	case RedactLogEnable:
+		for _, pos := range position {
+			if len(args) > pos {
+				args[pos] = "?"
+			}
+		}
+	case RedactLogMarker:
+		for _, pos := range position {
+			if len(args) > pos {
+				args[pos] = &redactFormatter{args[pos]}
+			}
+		}
+	}
+}
+
 // ErrorEqual returns a boolean indicating whether err1 is equal to err2.
 func ErrorEqual(err1, err2 error) bool {
 	e1 := Cause(err1)
@@ -325,4 +356,22 @@ func Normalize(message string, opts ...NormalizeOption) *Error {
 		opt(e)
 	}
 	return e
+}
+
+type redactFormatter struct {
+	arg interface{}
+}
+
+func (e *redactFormatter) Format(f fmt.State, verb rune) {
+	origin := fmt.Sprintf(fmt.FormatString(f, verb), e.arg)
+	fmt.Fprintf(f, "‹")
+	for _, c := range origin {
+		if c == '‹' || c == '›' {
+			fmt.Fprintf(f, "%c", c)
+			fmt.Fprintf(f, "%c", c)
+		} else {
+			fmt.Fprintf(f, "%c", c)
+		}
+	}
+	fmt.Fprintf(f, "›")
 }
