@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"reflect"
 	"strconv"
 	"testing"
@@ -494,4 +495,30 @@ func TestHasTrace(t *testing.T) {
 	require.False(t, HasStack(targetErr.FastGenByArgs("fast gen arg")))
 	require.True(t, HasStack(Trace(targetErr.FastGen("fast gen"))))
 	require.True(t, HasStack(targetErr.GenWithStack("gen")))
+}
+
+func TestGetErrStackMsg(t *testing.T) {
+	require.Equal(t, "", GetErrStackMsg(nil))
+
+	namedErr := Normalize("named err message", RFCCodeText("NamedError"))
+	require.False(t, HasStack(namedErr))
+	require.Equal(t, "named err message", GetErrStackMsg(namedErr))
+	tracedErr := Trace(namedErr)
+	require.Equal(t, "named err message", GetErrStackMsg(tracedErr))
+
+	annotatedErr := Annotate(tracedErr, "annotated message")
+	require.Equal(t, "annotated message: named err message", GetErrStackMsg(annotatedErr))
+
+	annotatedErr = Annotate(annotatedErr, "annotated message 2")
+	require.Equal(t, "annotated message 2: annotated message: named err message", GetErrStackMsg(annotatedErr))
+
+	fundErr := New("new fundamental error")
+	wrappedErr := namedErr.Wrap(fundErr)
+	require.Equal(t, "named err message: new fundamental error", GetErrStackMsg(wrappedErr))
+	fastGen := wrappedErr.FastGen("fast gen")
+	require.Equal(t, "fast gen: new fundamental error", GetErrStackMsg(fastGen))
+
+	urlErr := &url.Error{Op: "GET", URL: "/url", Err: errors.New("internal golang err")}
+	fastGen = namedErr.Wrap(urlErr).FastGen("fast gen")
+	require.Equal(t, `fast gen: GET "/url": internal golang err`, GetErrStackMsg(fastGen))
 }

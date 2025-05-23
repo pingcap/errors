@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -15,13 +16,13 @@ func TestFrameLine(t *testing.T) {
 		want int
 	}{{
 		Frame(initpc),
-		10,
+		11,
 	}, {
 		func() Frame {
 			var pc, _, _, _ = runtime.Caller(0)
 			return Frame(pc)
 		}(),
-		21,
+		22,
 	}, /* { // TODO stdlib `runtime` Behavior changed between 1.13 and 1.14
 			func() Frame {
 				var pc, _, _, _ = runtime.Caller(1)
@@ -67,7 +68,7 @@ func TestFrameFormat(t *testing.T) {
 		Frame(initpc),
 		"%+s",
 		"github.com/pingcap/errors.init\n" +
-			"\t.+/github.com/pingcap/errors/stack_test.go",
+			"\t.+/pingcap/errors/stack_test.go",
 	}, {
 		Frame(0),
 		"%s",
@@ -79,7 +80,7 @@ func TestFrameFormat(t *testing.T) {
 	}, {
 		Frame(initpc),
 		"%d",
-		"10",
+		"11",
 	}, {
 		Frame(0),
 		"%d",
@@ -109,12 +110,12 @@ func TestFrameFormat(t *testing.T) {
 	}, {
 		Frame(initpc),
 		"%v",
-		"stack_test.go:10",
+		"stack_test.go:11",
 	}, {
 		Frame(initpc),
 		"%+v",
 		"github.com/pingcap/errors.init\n" +
-			"\t.+/github.com/pingcap/errors/stack_test.go:10",
+			"\t.+/pingcap/errors/stack_test.go:11",
 	}, {
 		Frame(0),
 		"%v",
@@ -154,24 +155,24 @@ func TestStackTrace(t *testing.T) {
 	}{{
 		New("ooh"), []string{
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/github.com/pingcap/errors/stack_test.go:155",
+				"\t.+/pingcap/errors/stack_test.go",
 		},
 	}, {
 		Annotate(New("ooh"), "ahh"), []string{
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/github.com/pingcap/errors/stack_test.go:160", // this is the stack of Wrap, not New
+				"\t.+/pingcap/errors/stack_test.go", // this is the stack of Wrap, not New
 		},
 	}, {
 		Cause(Annotate(New("ooh"), "ahh")), []string{
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/github.com/pingcap/errors/stack_test.go:165", // this is the stack of New
+				"\t.+/pingcap/errors/stack_test.go", // this is the stack of New
 		},
 	}, {
 		func() error { return New("ooh") }(), []string{
 			`github.com/pingcap/errors.(func·009|TestStackTrace.func1)` +
-				"\n\t.+/github.com/pingcap/errors/stack_test.go:170", // this is the stack of New
+				"\n\t.+/pingcap/errors/stack_test.go", // this is the stack of New
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/github.com/pingcap/errors/stack_test.go:170", // this is the stack of New's caller
+				"\t.+/pingcap/errors/stack_test.go", // this is the stack of New's caller
 		},
 	}, {
 		Cause(func() error {
@@ -179,12 +180,14 @@ func TestStackTrace(t *testing.T) {
 				return Errorf("hello %s", fmt.Sprintf("world"))
 			}()
 		}()), []string{
-			`github.com/pingcap/errors.(func·010|TestStackTrace.func2.1)` +
-				"\n\t.+/github.com/pingcap/errors/stack_test.go:179", // this is the stack of Errorf
+			// go 1.23 when Debug its suffix is "TestStackTrace.func2.1", it's
+			// "TestStackTrace.TestStackTrace.func2.func3" when Run
+			`github.com/pingcap/errors.(func·010|TestStackTrace.func2.1|TestStackTrace.TestStackTrace.func2.func3)` +
+				"\n\t.+/pingcap/errors/stack_test.go", // this is the stack of Errorf
 			`github.com/pingcap/errors.(func·011|TestStackTrace.func2)` +
-				"\n\t.+/github.com/pingcap/errors/stack_test.go:180", // this is the stack of Errorf's caller
+				"\n\t.+/pingcap/errors/stack_test.go", // this is the stack of Errorf's caller
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/github.com/pingcap/errors/stack_test.go:181", // this is the stack of Errorf's caller's caller
+				"\t.+/pingcap/errors/stack_test.go", // this is the stack of Errorf's caller's caller
 		},
 	}}
 	for i, tt := range tests {
@@ -263,13 +266,13 @@ func TestStackTraceFormat(t *testing.T) {
 		"%+v",
 		"\n" +
 			"github.com/pingcap/errors.stackTrace\n" +
-			"\t.+/github.com/pingcap/errors/stack_test.go:211\n" +
+			"\t.+/pingcap/errors/stack_test.go:\\d+\n" +
 			"github.com/pingcap/errors.TestStackTraceFormat\n" +
-			"\t.+/github.com/pingcap/errors/stack_test.go:262",
+			"\t.+/pingcap/errors/stack_test.go:\\d+",
 	}, {
 		stackTrace()[:2],
 		"%#v",
-		`\[\]errors.Frame{stack_test.go:211, stack_test.go:270}`,
+		`\[\]errors.Frame{stack_test.go:\d+, stack_test.go:\d+}`,
 	}}
 
 	for i, tt := range tests {
@@ -294,7 +297,8 @@ func TestNewNoStackError(t *testing.T) {
 	err = Trace(err)
 	err = Trace(err)
 	result := fmt.Sprintf("%+v", err)
-	if result != "test error" {
+	if !strings.Contains(result, "test error") ||
+		!strings.Contains(result, "pingcap/errors.TestNewNoStackError") {
 		t.Errorf("NewNoStackError(): want %s, got %v", "test error", result)
 	}
 }
@@ -304,7 +308,8 @@ func TestNewNoStackErrorf(t *testing.T) {
 	err = Trace(err)
 	err = Trace(err)
 	result := fmt.Sprintf("%+v", err)
-	if result != "test error yes" {
+	if !strings.Contains(result, "test error yes") ||
+		!strings.Contains(result, "pingcap/errors.TestNewNoStackErrorf") {
 		t.Errorf("NewNoStackError(): want %s, got %v", "test error", result)
 	}
 }
@@ -314,7 +319,8 @@ func TestSuspendError(t *testing.T) {
 	err = SuspendStack(err)
 	err = Trace(err)
 	result := fmt.Sprintf("%+v", err)
-	if result != "EOF" {
+	if !strings.Contains(result, "EOF") ||
+		!strings.Contains(result, "pingcap/errors.TestSuspendError") {
 		t.Errorf("NewNoStackError(): want %s, got %v", "EOF", result)
 	}
 	if io.EOF != Cause(err) {

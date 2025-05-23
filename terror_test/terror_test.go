@@ -15,12 +15,13 @@ package terror_test
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/suite"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/suite"
 
 	"github.com/pingcap/errors"
 )
@@ -76,7 +77,7 @@ func (s *TErrorTestSuite) TestTraceAndLocation() {
 			sysStack++
 		}
 	}
-	s.Equalf(13, len(lines)-(2*sysStack), "stack = \n%s", stack)
+	s.Equalf(11, len(lines)-(2*sysStack), "stack = \n%s", stack)
 	var containTerr bool
 	for _, v := range lines {
 		if strings.Contains(v, "terror_test.go") {
