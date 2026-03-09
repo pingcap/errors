@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"testing"
+	"unsafe"
 )
 
 func errorMatches(t *testing.T, err error, re string) {
@@ -47,5 +48,35 @@ func TestRedactFormatter(t *testing.T) {
 	v = &redactFormatter{"‹"}
 	if a := fmt.Sprintf("%s", v); a != "‹‹‹›" {
 		t.Errorf("%s != <<<>", a)
+	}
+}
+
+func TestGenWithStackByArgsFreezeStringArg(t *testing.T) {
+	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
+
+	origin := []byte("120120519090607")
+	arg := *(*string)(unsafe.Pointer(&origin))
+	err := errTest.GenWithStackByArgs(arg)
+
+	copy(origin, "1 1:1:1.0000027")
+	got := err.(*withStack).error.(*Error).GetMsg()
+	want := "Incorrect time value: '120120519090607'"
+	if got != want {
+		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
+	}
+}
+
+func TestFastGenByArgsFreezeStringArg(t *testing.T) {
+	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
+
+	origin := []byte("120120519090607")
+	arg := *(*string)(unsafe.Pointer(&origin))
+	err := errTest.FastGenByArgs(arg)
+
+	copy(origin, "1 1:1:1.0000027")
+	got := err.(*withStack).error.(*Error).GetMsg()
+	want := "Incorrect time value: '120120519090607'"
+	if got != want {
+		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
 	}
 }

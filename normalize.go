@@ -142,6 +142,20 @@ func (e *Error) GetMsg() string {
 	return e.message
 }
 
+func freezeStringArgs(args []interface{}) []interface{} {
+	frozenArgs := make([]interface{}, len(args))
+	copy(frozenArgs, args)
+	for i := range frozenArgs {
+		strArg, ok := frozenArgs[i].(string)
+		if !ok {
+			continue
+		}
+		// Freeze string args so delayed formatting can't observe later writes from zero-copy aliases.
+		frozenArgs[i] = string(append([]byte(nil), strArg...))
+	}
+	return frozenArgs
+}
+
 func (e *Error) GetSelfMsg() string {
 	return e.GetMsg()
 }
@@ -172,7 +186,7 @@ func (e *Error) GenWithStack(format string, args ...interface{}) error {
 func (e *Error) GenWithStackByArgs(args ...interface{}) error {
 	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
-	err.args = args
+	err.args = freezeStringArgs(args)
 	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
@@ -192,7 +206,7 @@ func (e *Error) FastGen(format string, args ...interface{}) error {
 func (e *Error) FastGenByArgs(args ...interface{}) error {
 	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
-	err.args = args
+	err.args = freezeStringArgs(args)
 	return SuspendStack(&err)
 }
 

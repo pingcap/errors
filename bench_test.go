@@ -106,3 +106,44 @@ func BenchmarkStackFormatting(b *testing.B) {
 	}
 	GlobalE = stackStr
 }
+
+func BenchmarkByArgsArgFreeze(b *testing.B) {
+	errPrototype := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Bench"))
+	stringArg := "120120519090607"
+
+	b.Run("FastGenByArgs-string", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.FastGenByArgs(stringArg)
+		}
+		GlobalE = err
+	})
+
+	b.Run("FastGenByArgs-int", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.FastGenByArgs(120120519090607)
+		}
+		GlobalE = err
+	})
+
+	b.Run("GenWithStackByArgs-string", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.GenWithStackByArgs(stringArg)
+		}
+		GlobalE = err
+	})
+
+	b.Run("GenWithStackByArgs-int", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.GenWithStackByArgs(120120519090607)
+		}
+		GlobalE = err
+	})
+}
