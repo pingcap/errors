@@ -143,10 +143,11 @@ func (e *Error) GetMsg() string {
 }
 
 func freezeStringArgs(args []interface{}) []interface{} {
-	frozenArgs := make([]interface{}, len(args))
-	copy(frozenArgs, args)
-	for i := range frozenArgs {
-		strArg, ok := frozenArgs[i].(string)
+	// This helper intentionally mutates the input slice in place.
+	// It is only used inside error-construction paths where args are internal and should
+	// not be reused by callers after passing into Gen*/FastGen* APIs.
+	for i := range args {
+		strArg, ok := args[i].(string)
 		if !ok {
 			continue
 		}
@@ -155,9 +156,9 @@ func freezeStringArgs(args []interface{}) []interface{} {
 		// observe later writes and print a different value than the one used when creating the error.
 		// Copying at every call site in TiDB is more expensive; freezing in this central path keeps
 		// the copy cost only on error construction.
-		frozenArgs[i] = string(append([]byte(nil), strArg...))
+		args[i] = string(append([]byte(nil), strArg...))
 	}
-	return frozenArgs
+	return args
 }
 
 func (e *Error) GetSelfMsg() string {
