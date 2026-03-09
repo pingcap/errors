@@ -150,7 +150,11 @@ func freezeStringArgs(args []interface{}) []interface{} {
 		if !ok {
 			continue
 		}
-		// Freeze string args so delayed formatting can't observe later writes from zero-copy aliases.
+		// TiDB may pass unsafe zero-copy strings (for example from chunk buffers) as error args.
+		// Error message rendering is deferred until GetMsg/Error, so without freezing here we may
+		// observe later writes and print a different value than the one used when creating the error.
+		// Copying at every call site in TiDB is more expensive; freezing in this central path keeps
+		// the copy cost only on error construction.
 		frozenArgs[i] = string(append([]byte(nil), strArg...))
 	}
 	return frozenArgs
@@ -177,7 +181,7 @@ func (e *Error) GenWithStack(format string, args ...interface{}) error {
 	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
-	err.args = args
+	err.args = freezeStringArgs(args)
 	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
@@ -197,7 +201,7 @@ func (e *Error) FastGen(format string, args ...interface{}) error {
 	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
-	err.args = args
+	err.args = freezeStringArgs(args)
 	return SuspendStack(&err)
 }
 
@@ -327,7 +331,7 @@ func (e *Error) FastGenWithCause(args ...interface{}) error {
 	if e.cause != nil {
 		err.message = e.cause.Error()
 	}
-	err.args = args
+	err.args = freezeStringArgs(args)
 	return SuspendStack(&err)
 }
 
@@ -336,7 +340,7 @@ func (e *Error) GenWithStackByCause(args ...interface{}) error {
 	if e.cause != nil {
 		err.message = e.cause.Error()
 	}
-	err.args = args
+	err.args = freezeStringArgs(args)
 	err.fillLineAndFile(1)
 	return AddStack(&err)
 }

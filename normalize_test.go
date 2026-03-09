@@ -80,3 +80,63 @@ func TestFastGenByArgsFreezeStringArg(t *testing.T) {
 		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
 	}
 }
+
+func TestGenWithStackFreezeStringArg(t *testing.T) {
+	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
+
+	origin := []byte("120120519090607")
+	arg := *(*string)(unsafe.Pointer(&origin))
+	err := errTest.GenWithStack("Incorrect time value: '%s'", arg)
+
+	copy(origin, "1 1:1:1.0000027")
+	got := err.(*withStack).error.(*Error).GetMsg()
+	want := "Incorrect time value: '120120519090607'"
+	if got != want {
+		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
+	}
+}
+
+func TestFastGenFreezeStringArg(t *testing.T) {
+	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
+
+	origin := []byte("120120519090607")
+	arg := *(*string)(unsafe.Pointer(&origin))
+	err := errTest.FastGen("Incorrect time value: '%s'", arg)
+
+	copy(origin, "1 1:1:1.0000027")
+	got := err.(*withStack).error.(*Error).GetMsg()
+	want := "Incorrect time value: '120120519090607'"
+	if got != want {
+		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
+	}
+}
+
+func TestGenWithStackByCauseFreezeStringArg(t *testing.T) {
+	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
+
+	origin := []byte("120120519090607")
+	arg := *(*string)(unsafe.Pointer(&origin))
+	err := errTest.GenWithStackByCause(arg)
+
+	copy(origin, "1 1:1:1.0000027")
+	got := err.(*withStack).error.(*Error).GetMsg()
+	want := "Incorrect time value: '120120519090607'"
+	if got != want {
+		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
+	}
+}
+
+func TestFastGenWithCauseFreezeStringArg(t *testing.T) {
+	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
+
+	origin := []byte("120120519090607")
+	arg := *(*string)(unsafe.Pointer(&origin))
+	err := errTest.FastGenWithCause(arg)
+
+	copy(origin, "1 1:1:1.0000027")
+	got := err.(*withStack).error.(*Error).GetMsg()
+	want := "Incorrect time value: '120120519090607'"
+	if got != want {
+		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
+	}
+}

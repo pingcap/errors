@@ -147,3 +147,44 @@ func BenchmarkByArgsArgFreeze(b *testing.B) {
 		GlobalE = err
 	})
 }
+
+func BenchmarkFormatArgFreeze(b *testing.B) {
+	errPrototype := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Bench"))
+	stringArg := "120120519090607"
+
+	b.Run("FastGen-string", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.FastGen("Incorrect time value: '%s'", stringArg)
+		}
+		GlobalE = err
+	})
+
+	b.Run("FastGen-int", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.FastGen("Incorrect time value: '%d'", 120120519090607)
+		}
+		GlobalE = err
+	})
+
+	b.Run("GenWithStack-string", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.GenWithStack("Incorrect time value: '%s'", stringArg)
+		}
+		GlobalE = err
+	})
+
+	b.Run("GenWithStack-int", func(b *testing.B) {
+		var err error
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			err = errPrototype.GenWithStack("Incorrect time value: '%d'", 120120519090607)
+		}
+		GlobalE = err
+	})
+}
