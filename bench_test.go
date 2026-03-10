@@ -113,7 +113,22 @@ type argsProfile struct {
 	build          func(count, stringLen int) []interface{}
 }
 
-func buildStringArgs(count, stringLen int) []interface{} {
+type benchmarkHackedStr string
+
+func (s benchmarkHackedStr) FreezeStr() string {
+	return string(append([]byte(nil), s...))
+}
+
+func buildHackedStringArgs(count, stringLen int) []interface{} {
+	arg := benchmarkHackedStr(strings.Repeat("x", stringLen))
+	args := make([]interface{}, count)
+	for i := range args {
+		args[i] = arg
+	}
+	return args
+}
+
+func buildPlainStringArgs(count, stringLen int) []interface{} {
 	arg := strings.Repeat("x", stringLen)
 	args := make([]interface{}, count)
 	for i := range args {
@@ -130,36 +145,7 @@ func buildIntArgs(count, _ int) []interface{} {
 	return args
 }
 
-func buildMixedArgs(count, stringLen int) []interface{} {
-	strArg := strings.Repeat("x", stringLen)
-	args := make([]interface{}, count)
-	for i := range args {
-		switch i % 4 {
-		case 0:
-			args[i] = strArg
-		case 1:
-			args[i] = i
-		case 2:
-			args[i] = i%2 == 0
-		default:
-			args[i] = float64(i) + 0.25
-		}
-	}
-	return args
-}
-
-func benchmarkFormat(count int) string {
-	if count <= 0 {
-		return ""
-	}
-	format := "%v"
-	for i := 1; i < count; i++ {
-		format += " %v"
-	}
-	return format
-}
-
-func BenchmarkByArgsArgFreeze(b *testing.B) {
+func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
 	errPrototype := Normalize("bench", RFCCodeText("Internal:Bench"))
 
 	apiCases := []struct {
@@ -174,10 +160,10 @@ func BenchmarkByArgsArgFreeze(b *testing.B) {
 		},
 	}
 	profiles := []argsProfile{
-		{name: "string", containsString: true, build: buildStringArgs},
-		{name: "int", containsString: false, build: buildIntArgs},
+		{name: "plain", containsString: true, build: buildPlainStringArgs},
+		{name: "hacked", containsString: true, build: buildHackedStringArgs},
 	}
-	argCounts := []int{1, 4, 8}
+	argCounts := []int{4}
 	stringLens := []int{16, 1024, 4096}
 
 	for _, apiCase := range apiCases {
@@ -204,69 +190,6 @@ func BenchmarkByArgsArgFreeze(b *testing.B) {
 							b.ReportAllocs()
 							for i := 0; i < b.N; i++ {
 								err = apiCase.call(errPrototype, args)
-							}
-							GlobalE = err
-						})
-					}
-				}
-			}
-		})
-	}
-}
-
-func BenchmarkFormatArgFreeze(b *testing.B) {
-	errPrototype := Normalize("bench", RFCCodeText("Internal:Bench"))
-
-	apiCases := []struct {
-		name string
-		call func(errPrototype *Error, format string, args []interface{}) error
-	}{
-		{
-			name: "FastGen",
-			call: func(errPrototype *Error, format string, args []interface{}) error {
-				return errPrototype.FastGen(format, args...)
-			},
-		},
-		{
-			name: "GenWithStack",
-			call: func(errPrototype *Error, format string, args []interface{}) error {
-				return errPrototype.GenWithStack(format, args...)
-			},
-		},
-	}
-	profiles := []argsProfile{
-		{name: "string", containsString: true, build: buildStringArgs},
-		{name: "int", containsString: false, build: buildIntArgs},
-		{name: "mixed", containsString: true, build: buildMixedArgs},
-	}
-	argCounts := []int{1, 4, 8}
-	stringLens := []int{16, 1024, 8192}
-
-	for _, apiCase := range apiCases {
-		apiCase := apiCase
-		b.Run(apiCase.name, func(b *testing.B) {
-			for _, profile := range profiles {
-				profile := profile
-				lens := []int{0}
-				if profile.containsString {
-					lens = stringLens
-				}
-				for _, argCount := range argCounts {
-					argCount := argCount
-					format := benchmarkFormat(argCount)
-					for _, strLen := range lens {
-						strLen := strLen
-						args := profile.build(argCount, strLen)
-						caseName := fmt.Sprintf("type-%s/count-%d", profile.name, argCount)
-						if profile.containsString {
-							caseName = fmt.Sprintf("%s/strlen-%d", caseName, strLen)
-						}
-
-						b.Run(caseName, func(b *testing.B) {
-							var err error
-							b.ReportAllocs()
-							for i := 0; i < b.N; i++ {
-								err = apiCase.call(errPrototype, format, args)
 							}
 							GlobalE = err
 						})
