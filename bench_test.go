@@ -1,10 +1,10 @@
 package errors
 
 import (
-	"fmt"
-	"testing"
-
 	stderrors "errors"
+	"fmt"
+	"strings"
+	"testing"
 )
 
 func noErrors(at, depth int) error {
@@ -107,84 +107,172 @@ func BenchmarkStackFormatting(b *testing.B) {
 	GlobalE = stackStr
 }
 
+type argsProfile struct {
+	name           string
+	containsString bool
+	build          func(count, stringLen int) []interface{}
+}
+
+func buildStringArgs(count, stringLen int) []interface{} {
+	arg := strings.Repeat("x", stringLen)
+	args := make([]interface{}, count)
+	for i := range args {
+		args[i] = arg
+	}
+	return args
+}
+
+func buildIntArgs(count, _ int) []interface{} {
+	args := make([]interface{}, count)
+	for i := range args {
+		args[i] = i
+	}
+	return args
+}
+
+func buildMixedArgs(count, stringLen int) []interface{} {
+	strArg := strings.Repeat("x", stringLen)
+	args := make([]interface{}, count)
+	for i := range args {
+		switch i % 4 {
+		case 0:
+			args[i] = strArg
+		case 1:
+			args[i] = i
+		case 2:
+			args[i] = i%2 == 0
+		default:
+			args[i] = float64(i) + 0.25
+		}
+	}
+	return args
+}
+
+func benchmarkFormat(count int) string {
+	if count <= 0 {
+		return ""
+	}
+	format := "%v"
+	for i := 1; i < count; i++ {
+		format += " %v"
+	}
+	return format
+}
+
 func BenchmarkByArgsArgFreeze(b *testing.B) {
-	errPrototype := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Bench"))
-	stringArg := "120120519090607"
+	errPrototype := Normalize("bench", RFCCodeText("Internal:Bench"))
 
-	b.Run("FastGenByArgs-string", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.FastGenByArgs(stringArg)
-		}
-		GlobalE = err
-	})
+	apiCases := []struct {
+		name string
+		call func(errPrototype *Error, args []interface{}) error
+	}{
+		{
+			name: "FastGenByArgs",
+			call: func(errPrototype *Error, args []interface{}) error {
+				return errPrototype.FastGenByArgs(args...)
+			},
+		},
+	}
+	profiles := []argsProfile{
+		{name: "string", containsString: true, build: buildStringArgs},
+		{name: "int", containsString: false, build: buildIntArgs},
+	}
+	argCounts := []int{1, 4, 8}
+	stringLens := []int{16, 1024, 4096}
 
-	b.Run("FastGenByArgs-int", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.FastGenByArgs(120120519090607)
-		}
-		GlobalE = err
-	})
+	for _, apiCase := range apiCases {
+		apiCase := apiCase
+		b.Run(apiCase.name, func(b *testing.B) {
+			for _, profile := range profiles {
+				profile := profile
+				lens := []int{0}
+				if profile.containsString {
+					lens = stringLens
+				}
+				for _, argCount := range argCounts {
+					argCount := argCount
+					for _, strLen := range lens {
+						strLen := strLen
+						args := profile.build(argCount, strLen)
+						caseName := fmt.Sprintf("type-%s/count-%d", profile.name, argCount)
+						if profile.containsString {
+							caseName = fmt.Sprintf("%s/strlen-%d", caseName, strLen)
+						}
 
-	b.Run("GenWithStackByArgs-string", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.GenWithStackByArgs(stringArg)
-		}
-		GlobalE = err
-	})
-
-	b.Run("GenWithStackByArgs-int", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.GenWithStackByArgs(120120519090607)
-		}
-		GlobalE = err
-	})
+						b.Run(caseName, func(b *testing.B) {
+							var err error
+							b.ReportAllocs()
+							for i := 0; i < b.N; i++ {
+								err = apiCase.call(errPrototype, args)
+							}
+							GlobalE = err
+						})
+					}
+				}
+			}
+		})
+	}
 }
 
 func BenchmarkFormatArgFreeze(b *testing.B) {
-	errPrototype := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Bench"))
-	stringArg := "120120519090607"
+	errPrototype := Normalize("bench", RFCCodeText("Internal:Bench"))
 
-	b.Run("FastGen-string", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.FastGen("Incorrect time value: '%s'", stringArg)
-		}
-		GlobalE = err
-	})
+	apiCases := []struct {
+		name string
+		call func(errPrototype *Error, format string, args []interface{}) error
+	}{
+		{
+			name: "FastGen",
+			call: func(errPrototype *Error, format string, args []interface{}) error {
+				return errPrototype.FastGen(format, args...)
+			},
+		},
+		{
+			name: "GenWithStack",
+			call: func(errPrototype *Error, format string, args []interface{}) error {
+				return errPrototype.GenWithStack(format, args...)
+			},
+		},
+	}
+	profiles := []argsProfile{
+		{name: "string", containsString: true, build: buildStringArgs},
+		{name: "int", containsString: false, build: buildIntArgs},
+		{name: "mixed", containsString: true, build: buildMixedArgs},
+	}
+	argCounts := []int{1, 4, 8}
+	stringLens := []int{16, 1024, 8192}
 
-	b.Run("FastGen-int", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.FastGen("Incorrect time value: '%d'", 120120519090607)
-		}
-		GlobalE = err
-	})
+	for _, apiCase := range apiCases {
+		apiCase := apiCase
+		b.Run(apiCase.name, func(b *testing.B) {
+			for _, profile := range profiles {
+				profile := profile
+				lens := []int{0}
+				if profile.containsString {
+					lens = stringLens
+				}
+				for _, argCount := range argCounts {
+					argCount := argCount
+					format := benchmarkFormat(argCount)
+					for _, strLen := range lens {
+						strLen := strLen
+						args := profile.build(argCount, strLen)
+						caseName := fmt.Sprintf("type-%s/count-%d", profile.name, argCount)
+						if profile.containsString {
+							caseName = fmt.Sprintf("%s/strlen-%d", caseName, strLen)
+						}
 
-	b.Run("GenWithStack-string", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.GenWithStack("Incorrect time value: '%s'", stringArg)
-		}
-		GlobalE = err
-	})
-
-	b.Run("GenWithStack-int", func(b *testing.B) {
-		var err error
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			err = errPrototype.GenWithStack("Incorrect time value: '%d'", 120120519090607)
-		}
-		GlobalE = err
-	})
+						b.Run(caseName, func(b *testing.B) {
+							var err error
+							b.ReportAllocs()
+							for i := 0; i < b.N; i++ {
+								err = apiCase.call(errPrototype, format, args)
+							}
+							GlobalE = err
+						})
+					}
+				}
+			}
+		})
+	}
 }
