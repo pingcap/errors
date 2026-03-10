@@ -1,10 +1,10 @@
 package errors
 
 import (
-	"fmt"
-	"testing"
-
 	stderrors "errors"
+	"fmt"
+	"strings"
+	"testing"
 )
 
 func noErrors(at, depth int) error {
@@ -105,4 +105,99 @@ func BenchmarkStackFormatting(b *testing.B) {
 		})
 	}
 	GlobalE = stackStr
+}
+
+type argsProfile struct {
+	name           string
+	containsString bool
+	build          func(count, stringLen int) []interface{}
+}
+
+type benchmarkHackedStr string
+
+func (s benchmarkHackedStr) FreezeStr() string {
+	return string(append([]byte(nil), s...))
+}
+
+func buildHackedStringArgs(count, stringLen int) []interface{} {
+	arg := benchmarkHackedStr(strings.Repeat("x", stringLen))
+	args := make([]interface{}, count)
+	for i := range args {
+		args[i] = arg
+	}
+	return args
+}
+
+func buildPlainStringArgs(count, stringLen int) []interface{} {
+	arg := strings.Repeat("x", stringLen)
+	args := make([]interface{}, count)
+	for i := range args {
+		args[i] = arg
+	}
+	return args
+}
+
+func buildIntArgs(count, _ int) []interface{} {
+	args := make([]interface{}, count)
+	for i := range args {
+		args[i] = i
+	}
+	return args
+}
+
+func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
+	errPrototype := Normalize("bench", RFCCodeText("Internal:Bench"))
+
+	apiCases := []struct {
+		name string
+		call func(errPrototype *Error, args []interface{}) error
+	}{
+		{
+			name: "FastGenByArgs",
+			call: func(errPrototype *Error, args []interface{}) error {
+				return errPrototype.FastGenByArgs(args...)
+			},
+		},
+	}
+	profiles := []argsProfile{
+		{name: "plain", containsString: true, build: buildPlainStringArgs},
+		{name: "hacked", containsString: true, build: buildHackedStringArgs},
+	}
+	argCounts := []int{1, 4, 8}
+	stringLens := []int{16, 1024}
+
+	for _, apiCase := range apiCases {
+		apiCase := apiCase
+		b.Run(apiCase.name, func(b *testing.B) {
+			for _, profile := range profiles {
+				profile := profile
+				lens := []int{0}
+				if profile.containsString {
+					lens = stringLens
+				}
+				for _, argCount := range argCounts {
+					argCount := argCount
+					for _, strLen := range lens {
+						strLen := strLen
+						templateArgs := profile.build(argCount, strLen)
+						caseName := fmt.Sprintf("type-%s/count-%d", profile.name, argCount)
+						if profile.containsString {
+							caseName = fmt.Sprintf("%s/strlen-%d", caseName, strLen)
+						}
+
+						b.Run(caseName, func(b *testing.B) {
+							var err error
+							args := make([]interface{}, len(templateArgs))
+							b.ReportAllocs()
+							for i := 0; i < b.N; i++ {
+								copy(args, templateArgs)
+								err = apiCase.call(errPrototype, args)
+							}
+							GlobalE = err
+						})
+					}
+				}
+			}
+		})
+	}
 }
