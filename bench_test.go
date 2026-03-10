@@ -163,8 +163,8 @@ func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
 		{name: "plain", containsString: true, build: buildPlainStringArgs},
 		{name: "hacked", containsString: true, build: buildHackedStringArgs},
 	}
-	argCounts := []int{4}
-	stringLens := []int{16, 1024, 4096}
+	argCounts := []int{1, 4, 8}
+	stringLens := []int{16, 1024}
 
 	for _, apiCase := range apiCases {
 		apiCase := apiCase
@@ -179,7 +179,7 @@ func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
 					argCount := argCount
 					for _, strLen := range lens {
 						strLen := strLen
-						args := profile.build(argCount, strLen)
+						templateArgs := profile.build(argCount, strLen)
 						caseName := fmt.Sprintf("type-%s/count-%d", profile.name, argCount)
 						if profile.containsString {
 							caseName = fmt.Sprintf("%s/strlen-%d", caseName, strLen)
@@ -187,8 +187,10 @@ func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
 
 						b.Run(caseName, func(b *testing.B) {
 							var err error
+							args := make([]interface{}, len(templateArgs))
 							b.ReportAllocs()
 							for i := 0; i < b.N; i++ {
+								copy(args, templateArgs)
 								err = apiCase.call(errPrototype, args)
 							}
 							GlobalE = err
