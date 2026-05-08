@@ -1,8 +1,10 @@
 package errors
 
 import (
+	stderrors "errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 	"unsafe"
 )
@@ -40,6 +42,39 @@ func TestCauseInErrorMessage(t *testing.T) {
 
 	notWrapped := errTest.GenWithStack("everything is alright")
 	errorMatches(t, notWrapped, `^\[Internal:Test\]everything is alright$`)
+}
+
+func TestWrappedNamedErrorGenWithStackByArgsFormatsCauseStack(t *testing.T) {
+	errTest := Normalize("named error: %s", RFCCodeText("Internal:Test"))
+
+	err := errTest.Wrap(New("cause error")).GenWithStackByArgs("wrapped")
+
+	if _, ok := err.(fmt.Formatter); !ok {
+		t.Fatalf("zap requires fmt.Formatter to emit errorVerbose for stackful errors, got %T", err)
+	}
+
+	formatted := fmt.Sprintf("%+v", err)
+	if !strings.Contains(formatted, "github.com/pingcap/errors.TestWrappedNamedErrorGenWithStackByArgsFormatsCauseStack") {
+		t.Fatalf("formatted error does not contain the wrapped cause stack:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, "[Internal:Test]named error: wrapped") {
+		t.Fatalf("formatted error does not contain named error context:\n%s", formatted)
+	}
+}
+
+func TestWrappedNamedErrorFormatsStacklessCause(t *testing.T) {
+	errTest := Normalize("named error: %s", RFCCodeText("Internal:Test"))
+
+	err := errTest.Wrap(stderrors.New("plain cause")).GenWithStackByArgs("wrapped")
+
+	formatted := fmt.Sprintf("%+v", err)
+	wantPrefix := "plain cause\n[Internal:Test]named error: wrapped\n"
+	if !strings.HasPrefix(formatted, wantPrefix) {
+		t.Fatalf("unexpected formatted error prefix:\ngot:  %q\nwant prefix: %q", formatted, wantPrefix)
+	}
+	if !strings.Contains(formatted, "github.com/pingcap/errors.TestWrappedNamedErrorFormatsStacklessCause") {
+		t.Fatalf("formatted error does not contain the generated stack:\n%s", formatted)
+	}
 }
 
 func TestRedactFormatter(t *testing.T) {
