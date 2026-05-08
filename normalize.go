@@ -92,6 +92,7 @@ type Error struct {
 }
 
 var _ messenger = (*Error)(nil)
+var _ fmt.Formatter = (*Error)(nil)
 
 // Code returns the numeric code of this error.
 // ID() will return textual error if there it is,
@@ -142,6 +143,26 @@ func (e *Error) Error() string {
 		return fmt.Sprintf("[%s]%s: %s", e.RFCCode(), e.GetMsg(), e.cause.Error())
 	}
 	return fmt.Sprintf("[%s]%s", e.RFCCode(), e.GetMsg())
+}
+
+func (e *Error) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			if e != nil && e.cause != nil {
+				fmt.Fprintf(s, "%+v\n", e.cause)
+				fmt.Fprintf(s, "[%s]%s", e.RFCCode(), e.GetMsg())
+				return
+			}
+			fmt.Fprint(s, e.Error())
+			return
+		}
+		fallthrough
+	case 's':
+		fmt.Fprint(s, e.Error())
+	case 'q':
+		fmt.Fprintf(s, "%q", e.Error())
+	}
 }
 
 func (e *Error) GetMsg() string {
