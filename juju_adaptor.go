@@ -36,7 +36,7 @@ func Annotate(err error, message string) error {
 }
 
 // Annotatef adds a message and ensures there is a stack trace.
-func Annotatef(err error, format string, args ...interface{}) error {
+func Annotatef(err error, format string, args ...any) error {
 	if err == nil {
 		return nil
 	}
@@ -68,7 +68,7 @@ func NewNoStackError(msg string) error {
 
 // NewNoStackErrorf creates error with error stack and formats according
 // to a format specifier and returns the string as a value that satisfies error.
-func NewNoStackErrorf(format string, args ...interface{}) error {
+func NewNoStackErrorf(format string, args ...any) error {
 	return &fundamental{
 		msg:   fmt.Sprintf(format, args...),
 		stack: &emptyStack,
@@ -127,22 +127,22 @@ func IsNotFound(err error) bool {
 }
 
 // NotFoundf represents an error with not found message.
-func NotFoundf(format string, args ...interface{}) error {
+func NotFoundf(format string, args ...any) error {
 	return Errorf(format+" not found", args...)
 }
 
 // BadRequestf represents an error with bad request message.
-func BadRequestf(format string, args ...interface{}) error {
+func BadRequestf(format string, args ...any) error {
 	return Errorf(format+" bad request", args...)
 }
 
 // NotSupportedf represents an error with not supported message.
-func NotSupportedf(format string, args ...interface{}) error {
+func NotSupportedf(format string, args ...any) error {
 	return Errorf(format+" not supported", args...)
 }
 
 // NotValidf represents an error with not valid message.
-func NotValidf(format string, args ...interface{}) error {
+func NotValidf(format string, args ...any) error {
 	return Errorf(format+" not valid", args...)
 }
 
@@ -152,7 +152,7 @@ func IsAlreadyExists(err error) bool {
 }
 
 // AlreadyExistsf represents an error with already exists message.
-func AlreadyExistsf(format string, args ...interface{}) error {
+func AlreadyExistsf(format string, args ...any) error {
 	return Errorf(format+" already exists", args...)
 }
 

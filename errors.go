@@ -109,7 +109,7 @@ func New(message string) error {
 // Errorf formats according to a format specifier and returns the string
 // as a value that satisfies error.
 // Errorf also records the stack trace at the point it was called.
-func Errorf(format string, args ...interface{}) error {
+func Errorf(format string, args ...any) error {
 	return &fundamental{
 		msg:   fmt.Sprintf(format, args...),
 		stack: callers(),
@@ -254,7 +254,7 @@ func Wrap(err error, message string) error {
 //
 // For most use cases this is deprecated in favor of Annotatef.
 // Annotatef avoids creating duplicate stack traces.
-func Wrapf(err error, format string, args ...interface{}) error {
+func Wrapf(err error, format string, args ...any) error {
 	if err == nil {
 		return nil
 	}

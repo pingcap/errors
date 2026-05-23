@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -42,11 +43,11 @@ func init() {
 	flag.BoolVar(&opt.retainCode, "retain-code", false, "Retain the generated code when generator exit")
 }
 
-func log(format string, args ...interface{}) {
+func log(format string, args ...any) {
 	fmt.Println(fmt.Sprintf(format, args...))
 }
 
-func fatal(format string, args ...interface{}) {
+func fatal(format string, args ...any) {
 	log(format, args...)
 	os.Exit(1)
 }
@@ -253,10 +254,8 @@ func errdoc(source, module string) ([]*errDecl, error) {
 			return err
 		}
 		if info.IsDir() {
-			for i := range ignored {
-				if ignored[i] == path {
-					return filepath.SkipDir
-				}
+			if slices.Contains(ignored, path) {
+				return filepath.SkipDir
 			}
 			return nil
 		}

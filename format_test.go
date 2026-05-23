@@ -358,7 +358,7 @@ func TestFormatWithMessage(t *testing.T) {
 	}
 }*/
 
-func testFormatRegexp(t *testing.T, n int, arg interface{}, format, want string) {
+func testFormatRegexp(t *testing.T, n int, arg any, format, want string) {
 	t.Helper()
 	got := fmt.Sprintf(format, arg)
 	gotLines := strings.SplitN(got, "\n", -1)
@@ -405,7 +405,7 @@ func parseBlocks(input string, detectStackboundaries bool) ([]string, error) {
 	wasStack := false
 	lines := map[string]bool{} // already found lines
 
-	for _, l := range strings.Split(input, "\n") {
+	for l := range strings.SplitSeq(input, "\n") {
 		isStackLine := stackLineR.MatchString(l)
 
 		switch {
@@ -451,7 +451,7 @@ func parseBlocks(input string, detectStackboundaries bool) ([]string, error) {
 	return blocks, nil
 }
 
-func testFormatCompleteCompare(t *testing.T, n int, arg interface{}, format string, want []string, detectStackBoundaries bool) {
+func testFormatCompleteCompare(t *testing.T, n int, arg any, format string, want []string, detectStackBoundaries bool) {
 	gotStr := fmt.Sprintf(format, arg)
 
 	got, err := parseBlocks(gotStr, detectStackBoundaries)

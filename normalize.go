@@ -86,7 +86,7 @@ type Error struct {
 	redactArgsPos []int
 	// Cause is used to warp some third party error.
 	cause error
-	args  []interface{}
+	args  []any
 	file  string
 	line  int
 }
@@ -130,7 +130,7 @@ func (e *Error) MessageTemplate() string {
 }
 
 // Args returns the message arguments of this error.
-func (e *Error) Args() []interface{} {
+func (e *Error) Args() []any {
 	return e.args
 }
 
@@ -172,7 +172,7 @@ func (e *Error) GetMsg() string {
 	return e.message
 }
 
-func freezeHackedStringArgs(args []interface{}) []interface{} {
+func freezeHackedStringArgs(args []any) []any {
 	// This helper intentionally mutates the input slice in place.
 	// It is only used inside error-construction paths where args are internal and should
 	// not be reused by callers after passing into Gen*/FastGen* APIs.
@@ -207,7 +207,7 @@ func (e *Error) fillLineAndFile(skip int) {
 }
 
 // GenWithStack generates a new *Error with the same class and code, and a new formatted message.
-func (e *Error) GenWithStack(format string, args ...interface{}) error {
+func (e *Error) GenWithStack(format string, args ...any) error {
 	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
@@ -217,7 +217,7 @@ func (e *Error) GenWithStack(format string, args ...interface{}) error {
 }
 
 // GenWithStackByArgs generates a new *Error with the same class and code, and new arguments.
-func (e *Error) GenWithStackByArgs(args ...interface{}) error {
+func (e *Error) GenWithStackByArgs(args ...any) error {
 	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
 	err.args = freezeHackedStringArgs(args)
@@ -227,7 +227,7 @@ func (e *Error) GenWithStackByArgs(args ...interface{}) error {
 
 // FastGen generates a new *Error with the same class and code, and a new formatted message.
 // This will not call runtime.Caller to get file and line.
-func (e *Error) FastGen(format string, args ...interface{}) error {
+func (e *Error) FastGen(format string, args ...any) error {
 	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
@@ -237,7 +237,7 @@ func (e *Error) FastGen(format string, args ...interface{}) error {
 
 // FastGen generates a new *Error with the same class and code, and a new arguments.
 // This will not call runtime.Caller to get file and line.
-func (e *Error) FastGenByArgs(args ...interface{}) error {
+func (e *Error) FastGenByArgs(args ...any) error {
 	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
 	err.args = freezeHackedStringArgs(args)
@@ -267,7 +267,7 @@ func (e *Error) NotEqual(err error) bool {
 }
 
 // RedactErrorArg redacts the args by position if RedactLogEnabled is enabled.
-func RedactErrorArg(args []interface{}, position []int) {
+func RedactErrorArg(args []any, position []int) {
 	switch RedactLogEnabled.Load() {
 	case RedactLogEnable:
 		for _, pos := range position {
@@ -356,7 +356,7 @@ func (e *Error) Cause() error {
 	return root
 }
 
-func (e *Error) FastGenWithCause(args ...interface{}) error {
+func (e *Error) FastGenWithCause(args ...any) error {
 	err := *e
 	if e.cause != nil {
 		err.message = e.cause.Error()
@@ -365,7 +365,7 @@ func (e *Error) FastGenWithCause(args ...interface{}) error {
 	return SuspendStack(&err)
 }
 
-func (e *Error) GenWithStackByCause(args ...interface{}) error {
+func (e *Error) GenWithStackByCause(args ...any) error {
 	err := *e
 	if e.cause != nil {
 		err.message = e.cause.Error()
@@ -409,7 +409,7 @@ func Normalize(message string, opts ...NormalizeOption) *Error {
 }
 
 type redactFormatter struct {
-	arg interface{}
+	arg any
 }
 
 func (e *redactFormatter) Format(f fmt.State, verb rune) {

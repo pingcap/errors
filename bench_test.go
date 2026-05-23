@@ -23,7 +23,7 @@ func yesErrors(at, depth int) error {
 
 // GlobalE is an exported global to store the result of benchmark results,
 // preventing the compiler from optimising the benchmark functions away.
-var GlobalE interface{}
+var GlobalE any
 
 func BenchmarkErrors(b *testing.B) {
 	type run struct {
@@ -110,7 +110,7 @@ func BenchmarkStackFormatting(b *testing.B) {
 type argsProfile struct {
 	name           string
 	containsString bool
-	build          func(count, stringLen int) []interface{}
+	build          func(count, stringLen int) []any
 }
 
 type benchmarkHackedStr string
@@ -119,26 +119,26 @@ func (s benchmarkHackedStr) FreezeStr() string {
 	return string(append([]byte(nil), s...))
 }
 
-func buildHackedStringArgs(count, stringLen int) []interface{} {
+func buildHackedStringArgs(count, stringLen int) []any {
 	arg := benchmarkHackedStr(strings.Repeat("x", stringLen))
-	args := make([]interface{}, count)
+	args := make([]any, count)
 	for i := range args {
 		args[i] = arg
 	}
 	return args
 }
 
-func buildPlainStringArgs(count, stringLen int) []interface{} {
+func buildPlainStringArgs(count, stringLen int) []any {
 	arg := strings.Repeat("x", stringLen)
-	args := make([]interface{}, count)
+	args := make([]any, count)
 	for i := range args {
 		args[i] = arg
 	}
 	return args
 }
 
-func buildIntArgs(count, _ int) []interface{} {
-	args := make([]interface{}, count)
+func buildIntArgs(count, _ int) []any {
+	args := make([]any, count)
 	for i := range args {
 		args[i] = i
 	}
@@ -150,11 +150,11 @@ func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
 
 	apiCases := []struct {
 		name string
-		call func(errPrototype *Error, args []interface{}) error
+		call func(errPrototype *Error, args []any) error
 	}{
 		{
 			name: "FastGenByArgs",
-			call: func(errPrototype *Error, args []interface{}) error {
+			call: func(errPrototype *Error, args []any) error {
 				return errPrototype.FastGenByArgs(args...)
 			},
 		},
@@ -167,18 +167,14 @@ func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
 	stringLens := []int{16, 1024}
 
 	for _, apiCase := range apiCases {
-		apiCase := apiCase
 		b.Run(apiCase.name, func(b *testing.B) {
 			for _, profile := range profiles {
-				profile := profile
 				lens := []int{0}
 				if profile.containsString {
 					lens = stringLens
 				}
 				for _, argCount := range argCounts {
-					argCount := argCount
 					for _, strLen := range lens {
-						strLen := strLen
 						templateArgs := profile.build(argCount, strLen)
 						caseName := fmt.Sprintf("type-%s/count-%d", profile.name, argCount)
 						if profile.containsString {
@@ -187,7 +183,7 @@ func BenchmarkByArgsHackedStrFreeze(b *testing.B) {
 
 						b.Run(caseName, func(b *testing.B) {
 							var err error
-							args := make([]interface{}, len(templateArgs))
+							args := make([]any, len(templateArgs))
 							b.ReportAllocs()
 							for i := 0; i < b.N; i++ {
 								copy(args, templateArgs)

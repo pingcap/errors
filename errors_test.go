@@ -135,7 +135,7 @@ func TestWrapf(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := Annotatef(tt.err, tt.message).Error()
+		got := Annotatef(tt.err, "%s", tt.message).Error()
 		if got != tt.want {
 			t.Errorf("Wrapf(%v, %q): got: %v, want %v", tt.err, tt.message, got, tt.want)
 		}
