@@ -22,6 +22,7 @@ import (
 )
 
 var _ fmt.Formatter = (*redactFormatter)(nil)
+var _ fmt.Formatter = redactedArg{}
 
 // RedactLogEnabled defines whether the arguments of Error need to be redacted.
 var RedactLogEnabled atomic.String
@@ -208,19 +209,19 @@ func (e *Error) fillLineAndFile(skip int) {
 
 // GenWithStack generates a new *Error with the same class and code, and a new formatted message.
 func (e *Error) GenWithStack(format string, args ...any) error {
-	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
 	err.args = freezeHackedStringArgs(args)
+	RedactErrorArg(err.args, e.redactArgsPos)
 	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
 
 // GenWithStackByArgs generates a new *Error with the same class and code, and new arguments.
 func (e *Error) GenWithStackByArgs(args ...any) error {
-	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
 	err.args = freezeHackedStringArgs(args)
+	RedactErrorArg(err.args, e.redactArgsPos)
 	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
@@ -228,19 +229,19 @@ func (e *Error) GenWithStackByArgs(args ...any) error {
 // FastGen generates a new *Error with the same class and code, and a new formatted message.
 // This will not call runtime.Caller to get file and line.
 func (e *Error) FastGen(format string, args ...any) error {
-	// TODO: RedactErrorArg
 	err := *e
 	err.message = format
 	err.args = freezeHackedStringArgs(args)
+	RedactErrorArg(err.args, e.redactArgsPos)
 	return SuspendStack(&err)
 }
 
 // FastGen generates a new *Error with the same class and code, and a new arguments.
 // This will not call runtime.Caller to get file and line.
 func (e *Error) FastGenByArgs(args ...any) error {
-	RedactErrorArg(args, e.redactArgsPos)
 	err := *e
 	err.args = freezeHackedStringArgs(args)
+	RedactErrorArg(err.args, e.redactArgsPos)
 	return SuspendStack(&err)
 }
 
@@ -272,7 +273,7 @@ func RedactErrorArg(args []any, position []int) {
 	case RedactLogEnable:
 		for _, pos := range position {
 			if len(args) > pos {
-				args[pos] = "?"
+				args[pos] = redactedArg{}
 			}
 		}
 	case RedactLogMarker:
@@ -362,6 +363,7 @@ func (e *Error) FastGenWithCause(args ...any) error {
 		err.message = e.cause.Error()
 	}
 	err.args = freezeHackedStringArgs(args)
+	RedactErrorArg(err.args, e.redactArgsPos)
 	return SuspendStack(&err)
 }
 
@@ -371,6 +373,7 @@ func (e *Error) GenWithStackByCause(args ...any) error {
 		err.message = e.cause.Error()
 	}
 	err.args = freezeHackedStringArgs(args)
+	RedactErrorArg(err.args, e.redactArgsPos)
 	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
@@ -406,6 +409,12 @@ func Normalize(message string, opts ...NormalizeOption) *Error {
 		opt(e)
 	}
 	return e
+}
+
+type redactedArg struct{}
+
+func (redactedArg) Format(f fmt.State, _ rune) {
+	fmt.Fprint(f, "?")
 }
 
 type redactFormatter struct {
