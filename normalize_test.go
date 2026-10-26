@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"unsafe"
+
+	"github.com/stretchr/testify/require"
 )
 
 type hackedStringArg struct {
@@ -91,6 +93,220 @@ func TestRedactFormatter(t *testing.T) {
 	v = &redactFormatter{"‹"}
 	if a := fmt.Sprintf("%s", v); a != "‹‹‹›" {
 		t.Errorf("%s != <<<>", a)
+	}
+}
+
+func TestRedactedArgFormatter(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	RedactLogEnabled.Store(RedactLogEnable)
+	args := []any{42}
+	RedactErrorArg(args, []int{0})
+
+	for _, format := range []string{
+		"%v", "%+v", "%#v", "%s", "%q", "%d", "%04d", "%+8.4d",
+		"%b", "%o", "%O", "%x", "%X", "%c", "%U", "%t",
+		"%e", "%E", "%f", "%F", "%g", "%G", "%.0s", "%z",
+	} {
+		t.Run(format, func(t *testing.T) {
+			require.Equal(t, "?", fmt.Sprintf(format, args...))
+		})
+	}
+}
+
+func TestGenWithStackRedaction(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	prototype := Normalize("unused template", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 5}))
+
+	for _, tc := range []struct {
+		mode string
+		want string
+	}{
+		{RedactLogDisable, "value secret‹›, count 0042, public visible"},
+		{RedactLogEnable, "value ?, count 0042, public visible"},
+		{RedactLogMarker, "value ‹secret‹‹›››, count 0042, public visible"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			RedactLogEnabled.Store(tc.mode)
+			origin := []byte("secret‹›")
+			err := prototype.GenWithStack("value %s, count %04d, public %s", hackedStringArg{raw: origin}, 42, "visible")
+			copy(origin, "modified")
+			got := err.(*withStack).error.(*Error)
+			require.Equal(t, tc.want, got.GetMsg())
+			require.Equal(t, prototype.ID(), got.ID())
+			require.True(t, HasStack(err))
+			file, line := got.Location()
+			require.True(t, strings.HasSuffix(file, "normalize_test.go"))
+			require.Positive(t, line)
+			require.Equal(t, "unused template", prototype.message)
+			require.Empty(t, prototype.args)
+		})
+	}
+}
+
+func TestFastGenRedaction(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	prototype := Normalize("unused template", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 1, 5}))
+	const format = "value %s, count %04d, public %s"
+
+	for _, tc := range []struct {
+		mode string
+		want string
+	}{
+		{RedactLogDisable, "value secret‹›, count 0042, public visible"},
+		{RedactLogEnable, "value ?, count ?, public visible"},
+		{RedactLogMarker, "value ‹secret‹‹›››, count ‹0042›, public visible"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			RedactLogEnabled.Store(tc.mode)
+			origin := []byte("secret‹›")
+			err := prototype.FastGen(format, hackedStringArg{raw: origin}, 42, "visible")
+			copy(origin, "modified")
+			got := err.(*withStack).error.(*Error)
+			require.Equal(t, tc.want, got.GetMsg())
+			require.Equal(t, prototype.ID(), got.ID())
+			require.False(t, HasStack(err))
+			file, line := got.Location()
+			require.Empty(t, file)
+			require.Zero(t, line)
+			require.Equal(t, "unused template", prototype.message)
+			require.Empty(t, prototype.args)
+		})
+	}
+}
+
+func TestGenWithStackByArgsRedaction(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	prototype := Normalize("value %s, count %04d, public %s", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 5}))
+
+	for _, tc := range []struct {
+		mode string
+		want string
+	}{
+		{RedactLogDisable, "value secret‹›, count 0042, public visible"},
+		{RedactLogEnable, "value ?, count 0042, public visible"},
+		{RedactLogMarker, "value ‹secret‹‹›››, count 0042, public visible"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			RedactLogEnabled.Store(tc.mode)
+			origin := []byte("secret‹›")
+			err := prototype.GenWithStackByArgs(hackedStringArg{raw: origin}, 42, "visible")
+			copy(origin, "modified")
+			got := err.(*withStack).error.(*Error)
+			require.Equal(t, tc.want, got.GetMsg())
+			require.Equal(t, prototype.ID(), got.ID())
+			require.True(t, HasStack(err))
+			file, line := got.Location()
+			require.True(t, strings.HasSuffix(file, "normalize_test.go"))
+			require.Positive(t, line)
+			require.Equal(t, "value %s, count %04d, public %s", prototype.message)
+			require.Empty(t, prototype.args)
+		})
+	}
+}
+
+func TestFastGenByArgsRedaction(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	prototype := Normalize("value %s, count %04d, public %s", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 1, 5}))
+	const format = "value %s, count %04d, public %s"
+
+	for _, tc := range []struct {
+		mode string
+		want string
+	}{
+		{RedactLogDisable, "value secret‹›, count 0042, public visible"},
+		{RedactLogEnable, "value ?, count ?, public visible"},
+		{RedactLogMarker, "value ‹secret‹‹›››, count ‹0042›, public visible"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			RedactLogEnabled.Store(tc.mode)
+			origin := []byte("secret‹›")
+			err := prototype.FastGenByArgs(hackedStringArg{raw: origin}, 42, "visible")
+			copy(origin, "modified")
+			got := err.(*withStack).error.(*Error)
+			require.Equal(t, tc.want, got.GetMsg())
+			require.Equal(t, prototype.ID(), got.ID())
+			require.False(t, HasStack(err))
+			file, line := got.Location()
+			require.Empty(t, file)
+			require.Zero(t, line)
+			require.Equal(t, format, prototype.message)
+			require.Empty(t, prototype.args)
+		})
+	}
+}
+
+func TestGenWithStackByCauseRedaction(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	prototype := Normalize("template %s, public %s", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 5}))
+	cause := stderrors.New("cause %s, public %s")
+	wrapped := prototype.Wrap(cause)
+
+	for _, tc := range []struct {
+		mode string
+		arg  string
+	}{
+		{RedactLogDisable, "secret‹›"},
+		{RedactLogEnable, "?"},
+		{RedactLogMarker, "‹secret‹‹›››"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			RedactLogEnabled.Store(tc.mode)
+			origin := []byte("secret‹›")
+			err := wrapped.GenWithStackByCause(hackedStringArg{raw: origin}, "visible")
+			fallback := prototype.GenWithStackByCause(hackedStringArg{raw: origin}, "visible")
+			copy(origin, "modified")
+			got := err.(*withStack).error.(*Error)
+			require.Equal(t, "cause "+tc.arg+", public visible", got.GetMsg())
+			require.Same(t, cause, got.Unwrap())
+			require.Equal(t, prototype.ID(), got.ID())
+			require.True(t, HasStack(err))
+			require.Contains(t, fmt.Sprintf("%+v", err), "TestGenWithStackByCauseRedaction")
+			require.EqualError(t, fallback, "[Internal:Test]template "+tc.arg+", public visible")
+			require.Equal(t, "template %s, public %s", wrapped.message)
+			require.Empty(t, wrapped.args)
+		})
+	}
+}
+
+func TestFastGenWithCauseRedaction(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	prototype := Normalize("template %s, public %s", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 5}))
+	cause := stderrors.New("cause %s, public %s")
+	wrapped := prototype.Wrap(cause)
+
+	for _, tc := range []struct {
+		mode string
+		arg  string
+	}{
+		{RedactLogDisable, "secret‹›"},
+		{RedactLogEnable, "?"},
+		{RedactLogMarker, "‹secret‹‹›››"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			RedactLogEnabled.Store(tc.mode)
+			origin := []byte("secret‹›")
+			err := wrapped.FastGenWithCause(hackedStringArg{raw: origin}, "visible")
+			fallback := prototype.FastGenWithCause(hackedStringArg{raw: origin}, "visible")
+			copy(origin, "modified")
+			got := err.(*withStack).error.(*Error)
+			require.Equal(t, "cause "+tc.arg+", public visible", got.GetMsg())
+			require.Same(t, cause, got.Unwrap())
+			require.Equal(t, prototype.ID(), got.ID())
+			require.False(t, HasStack(err))
+			file, line := got.Location()
+			require.Empty(t, file)
+			require.Zero(t, line)
+			require.EqualError(t, fallback, "[Internal:Test]template "+tc.arg+", public visible")
+			require.Equal(t, "template %s, public %s", wrapped.message)
+			require.Empty(t, wrapped.args)
+		})
 	}
 }
 
