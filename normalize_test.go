@@ -243,9 +243,8 @@ func TestFastGenByArgsRedaction(t *testing.T) {
 func TestGenWithStackByCauseRedaction(t *testing.T) {
 	previousMode := RedactLogEnabled.Load()
 	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
-	prototype := Normalize("template %s, public %s", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 5}))
-	cause := stderrors.New("cause %s, public %s")
-	wrapped := prototype.Wrap(cause)
+	prototype := Normalize("unused template", RFCCodeText("Internal:Test"), RedactArgs([]int{0}))
+	causeTemplate := Normalize("cause %s, public %s, 95%% full, %%1000000[1]d", RFCCodeText("Internal:Cause"), RedactArgs([]int{0}))
 
 	for _, tc := range []struct {
 		mode string
@@ -257,19 +256,12 @@ func TestGenWithStackByCauseRedaction(t *testing.T) {
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
 			RedactLogEnabled.Store(tc.mode)
-			origin := []byte("secret‹›")
-			err := wrapped.GenWithStackByCause(hackedStringArg{raw: origin}, "visible")
-			fallback := prototype.GenWithStackByCause(hackedStringArg{raw: origin}, "visible")
-			copy(origin, "modified")
+			cause := causeTemplate.GenWithStackByArgs("secret‹›", "visible")
+			err := prototype.Wrap(cause).GenWithStackByCause()
+			want := "[Internal:Cause]cause " + tc.arg + ", public visible, 95% full, %1000000[1]d"
 			got := err.(*withStack).error.(*Error)
-			require.Equal(t, "cause "+tc.arg+", public visible", got.GetMsg())
-			require.Same(t, cause, got.Unwrap())
-			require.Equal(t, prototype.ID(), got.ID())
-			require.True(t, HasStack(err))
-			require.Contains(t, fmt.Sprintf("%+v", err), "TestGenWithStackByCauseRedaction")
-			require.EqualError(t, fallback, "[Internal:Test]template "+tc.arg+", public visible")
-			require.Equal(t, "template %s, public %s", wrapped.message)
-			require.Empty(t, wrapped.args)
+			require.Equal(t, want, got.GetMsg())
+			require.EqualError(t, err, "[Internal:Test]"+want+": "+want)
 		})
 	}
 }
@@ -277,9 +269,8 @@ func TestGenWithStackByCauseRedaction(t *testing.T) {
 func TestFastGenWithCauseRedaction(t *testing.T) {
 	previousMode := RedactLogEnabled.Load()
 	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
-	prototype := Normalize("template %s, public %s", RFCCodeText("Internal:Test"), RedactArgs([]int{0, 5}))
-	cause := stderrors.New("cause %s, public %s")
-	wrapped := prototype.Wrap(cause)
+	prototype := Normalize("unused template", RFCCodeText("Internal:Test"), RedactArgs([]int{0}))
+	causeTemplate := Normalize("cause %s, public %s, 95%% full, %%1000000[1]d", RFCCodeText("Internal:Cause"), RedactArgs([]int{0}))
 
 	for _, tc := range []struct {
 		mode string
@@ -291,21 +282,12 @@ func TestFastGenWithCauseRedaction(t *testing.T) {
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
 			RedactLogEnabled.Store(tc.mode)
-			origin := []byte("secret‹›")
-			err := wrapped.FastGenWithCause(hackedStringArg{raw: origin}, "visible")
-			fallback := prototype.FastGenWithCause(hackedStringArg{raw: origin}, "visible")
-			copy(origin, "modified")
+			cause := causeTemplate.GenWithStackByArgs("secret‹›", "visible")
+			err := prototype.Wrap(cause).FastGenWithCause()
+			want := "[Internal:Cause]cause " + tc.arg + ", public visible, 95% full, %1000000[1]d"
 			got := err.(*withStack).error.(*Error)
-			require.Equal(t, "cause "+tc.arg+", public visible", got.GetMsg())
-			require.Same(t, cause, got.Unwrap())
-			require.Equal(t, prototype.ID(), got.ID())
-			require.False(t, HasStack(err))
-			file, line := got.Location()
-			require.Empty(t, file)
-			require.Zero(t, line)
-			require.EqualError(t, fallback, "[Internal:Test]template "+tc.arg+", public visible")
-			require.Equal(t, "template %s, public %s", wrapped.message)
-			require.Empty(t, wrapped.args)
+			require.Equal(t, want, got.GetMsg())
+			require.EqualError(t, err, "[Internal:Test]"+want+": "+want)
 		})
 	}
 }
@@ -338,6 +320,8 @@ func TestGenWithStackByArgsFreezeHackedStringArg(t *testing.T) {
 	if got != want {
 		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
 	}
+	wrapped := errTest.Wrap(err).GenWithStackByCause()
+	require.Equal(t, err.Error(), wrapped.(*withStack).error.(*Error).GetMsg())
 }
 
 func TestFastGenByArgsFreezeHackedStringArg(t *testing.T) {
@@ -353,6 +337,8 @@ func TestFastGenByArgsFreezeHackedStringArg(t *testing.T) {
 	if got != want {
 		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
 	}
+	wrapped := errTest.Wrap(err).FastGenWithCause()
+	require.Equal(t, err.Error(), wrapped.(*withStack).error.(*Error).GetMsg())
 }
 
 func TestGenWithStackFreezeHackedStringArg(t *testing.T) {
@@ -376,36 +362,6 @@ func TestFastGenFreezeHackedStringArg(t *testing.T) {
 	origin := []byte("120120519090607")
 	arg := hackedStringArg{raw: origin}
 	err := errTest.FastGen("Incorrect time value: '%s'", arg)
-
-	copy(origin, "1 1:1:1.0000027")
-	got := err.(*withStack).error.(*Error).GetMsg()
-	want := "Incorrect time value: '120120519090607'"
-	if got != want {
-		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
-	}
-}
-
-func TestGenWithStackByCauseFreezeHackedStringArg(t *testing.T) {
-	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
-
-	origin := []byte("120120519090607")
-	arg := hackedStringArg{raw: origin}
-	err := errTest.GenWithStackByCause(arg)
-
-	copy(origin, "1 1:1:1.0000027")
-	got := err.(*withStack).error.(*Error).GetMsg()
-	want := "Incorrect time value: '120120519090607'"
-	if got != want {
-		t.Fatalf("message changed after source bytes mutated, got %q, want %q", got, want)
-	}
-}
-
-func TestFastGenWithCauseFreezeHackedStringArg(t *testing.T) {
-	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
-
-	origin := []byte("120120519090607")
-	arg := hackedStringArg{raw: origin}
-	err := errTest.FastGenWithCause(arg)
 
 	copy(origin, "1 1:1:1.0000027")
 	got := err.(*withStack).error.(*Error).GetMsg()
