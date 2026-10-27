@@ -94,5 +94,10 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 	}
 	e.code = ErrCode(tErr.Code)
 	e.message = tErr.Msg
+	e.args = nil
+	e.cause = nil
+	e.redactArgsPos = nil
+	e.file = ""
+	e.line = 0
 	return nil
 }
