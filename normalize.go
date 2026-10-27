@@ -357,23 +357,29 @@ func (e *Error) Cause() error {
 	return root
 }
 
-func (e *Error) FastGenWithCause(args ...any) error {
+// FastGenWithCause generates a stackless error with the same class and code,
+// using the cause's error text as a literal message without formatting arguments.
+// Only use it as errorTemplate.Wrap(err).FastGenWithCause().
+// To format the template with arguments, use FastGenByArgs instead.
+func (e *Error) FastGenWithCause() error {
 	err := *e
 	if e.cause != nil {
 		err.message = e.cause.Error()
+		err.args = nil
 	}
-	err.args = freezeHackedStringArgs(args)
-	RedactErrorArg(err.args, e.redactArgsPos)
 	return SuspendStack(&err)
 }
 
-func (e *Error) GenWithStackByCause(args ...any) error {
+// GenWithStackByCause generates an error with a stack trace and the same class
+// and code, using the cause's error text as a literal message without formatting arguments.
+// Only use it as errorTemplate.Wrap(err).GenWithStackByCause().
+// To format the template with arguments, use GenWithStackByArgs instead.
+func (e *Error) GenWithStackByCause() error {
 	err := *e
 	if e.cause != nil {
 		err.message = e.cause.Error()
+		err.args = nil
 	}
-	err.args = freezeHackedStringArgs(args)
-	RedactErrorArg(err.args, e.redactArgsPos)
 	err.fillLineAndFile(1)
 	return AddStack(&err)
 }
