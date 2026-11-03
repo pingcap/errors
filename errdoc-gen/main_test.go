@@ -21,9 +21,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/BurntSushi/toml"
 	"github.com/stretchr/testify/require"
 )
 
@@ -172,6 +174,45 @@ func TestErrdocCLIProcess(t *testing.T) {
 	os.Args = append(os.Args[:1], flag.Args()...)
 	main()
 	os.Exit(0)
+}
+
+func TestErrdocCLIRejectsNonNormalizedErrors(t *testing.T) {
+	repo, err := filepath.Abs("..")
+	require.NoError(t, err)
+	module, err := os.ReadFile(filepath.Join(repo, "go.mod"))
+	require.NoError(t, err)
+	sums, err := os.ReadFile(filepath.Join(repo, "go.sum"))
+	require.NoError(t, err)
+	fixtureModule := strings.Replace(string(module), "module github.com/pingcap/errors", "module example.com/project", 1) +
+		"\nrequire github.com/pingcap/errors v0.0.0\nreplace github.com/pingcap/errors => " + strconv.Quote(repo) + "\n"
+	for _, retain := range []bool{false, true} {
+		t.Run("retain-code="+strconv.FormatBool(retain), func(t *testing.T) {
+			source := t.TempDir()
+			writeSource(t, source, "go.mod", fixtureModule)
+			writeSource(t, source, "go.sum", string(sums))
+			writeSource(t, source, "errors.go", "package example\nimport \"errors\"\nvar ErrExample = errors.New(\"ordinary error\")\n")
+			const previous = "[\"example:existing\"]\nerror = 'existing'\ndescription = 'keep me'\n"
+			writeSource(t, source, "errors.toml", previous)
+			cmd := exec.Command(os.Args[0], "-test.run=^TestErrdocCLIProcess$", "--", "--source", source,
+				"--module", "example.com/project", "--retain-code="+strconv.FormatBool(retain))
+			cmd.Env = append(os.Environ(), "ERRDOC_GEN_TEST_PROCESS=1", "GOPROXY=off", "GOFLAGS=-mod=readonly")
+			output, err := cmd.CombinedOutput()
+			require.Error(t, err, "%s", output)
+			require.Contains(t, string(output), "No normalized errors found")
+			require.NotContains(t, string(output), "Generate successfully")
+			content, err := os.ReadFile(filepath.Join(source, "errors.toml"))
+			require.NoError(t, err)
+			require.Equal(t, previous, string(content))
+			var definitions map[string]map[string]string
+			require.NoError(t, toml.Unmarshal(content, &definitions))
+			require.Equal(t, "keep me", definitions["example:existing"]["description"])
+			if retain {
+				require.FileExists(t, filepath.Join(source, autoDirectoryName, entryFileName))
+			} else {
+				require.NoDirExists(t, filepath.Join(source, autoDirectoryName))
+			}
+		})
+	}
 }
 
 func TestErrdocCLIPreservesOutputOnFailure(t *testing.T) {

@@ -237,6 +237,10 @@ func main() {
 	cmd.Dir = opt.source
 	data, err := cmd.CombinedOutput()
 	if err != nil {
+		if !opt.retainCode {
+			out.Close()
+			os.RemoveAll(targetDir)
+		}
 		fatal("Generate %s failed: %v, output:\n%s", opt.output, err, string(data))
 	}
 
