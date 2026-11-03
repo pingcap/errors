@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"text/template"
@@ -55,6 +56,13 @@ func fatal(format string, args ...any) {
 const autoDirectoryName = "_errdoc-generator"
 const entryFileName = "main.go"
 
+const pathElementPattern = `[A-Za-z0-9_]+([.-][A-Za-z0-9_]+)*`
+
+var (
+	importPathRegexp      = regexp.MustCompile(`^` + pathElementPattern + `(/` + pathElementPattern + `)*$`)
+	ignoreDirectoryRegexp = regexp.MustCompile(`^(\./)?` + pathElementPattern + `(/` + pathElementPattern + `)*/?$`)
+)
+
 func main() {
 	flag.Parse()
 	if opt.source == "" {
@@ -68,8 +76,8 @@ func main() {
 	opt.source = source
 
 	_, err = os.Stat(filepath.Join(opt.source, "go.mod"))
-	if os.IsNotExist(err) {
-		fatal("The source directory is not the root path of codebase(go.mod not found)")
+	if err != nil {
+		fatal("Cannot access go.mod in the source directory: %v", err)
 	}
 
 	if opt.output == "" {
@@ -79,7 +87,7 @@ func main() {
 
 	errNames, err := errdoc(opt.source, opt.module)
 	if err != nil {
-		log("Extract the error documentation failed: %+v", err)
+		fatal("Extract the error documentation failed: %+v", err)
 	}
 
 	targetDir := filepath.Join(opt.source, autoDirectoryName)
@@ -107,7 +115,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/pingcap/errors"
 {{- range $decl := .}}
-	{{$decl.PackageName}} "{{- $decl.ImportPath}}"
+	{{$decl.PackageName}} {{printf "%q" $decl.ImportPath}}
 {{- end}}
 )
 
@@ -162,6 +170,10 @@ func main() {
 			}
 			dedup[codeText.String()] = s
 		}
+	}
+	if len(dedup) == 0 {
+		println("No normalized errors found; refusing to overwrite the output")
+		os.Exit(1)
 	}
 
 	var sorted []spec
@@ -238,6 +250,9 @@ type errDecl struct {
 }
 
 func errdoc(source, module string) ([]*errDecl, error) {
+	if err := validateImportPath(module); err != nil {
+		return nil, fmt.Errorf("invalid --module: %w", err)
+	}
 	source, err := filepath.Abs(source)
 	if err != nil {
 		return nil, err
@@ -245,9 +260,16 @@ func errdoc(source, module string) ([]*errDecl, error) {
 
 	dedup := map[string]*errDecl{}
 
-	ignored := strings.Split(opt.ignore, ",")
-	for i := range ignored {
-		ignored[i] = filepath.Join(source, ignored[i])
+	ignored := []string{filepath.Join(source, autoDirectoryName)}
+	for _, dir := range strings.Split(opt.ignore, ",") {
+		dir = strings.TrimSpace(dir)
+		if dir == "" {
+			continue
+		}
+		if !ignoreDirectoryRegexp.MatchString(dir) {
+			return nil, fmt.Errorf("invalid --ignore directory %q: must be a subdirectory of the source", dir)
+		}
+		ignored = append(ignored, filepath.Join(source, dir))
 	}
 	err = filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -265,8 +287,7 @@ func errdoc(source, module string) ([]*errDecl, error) {
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
-			// Ignore invalid source file
-			return nil
+			return fmt.Errorf("parse %s: %w", path, err)
 		}
 		errNames := export(file)
 		if len(errNames) < 1 {
@@ -277,26 +298,45 @@ func errdoc(source, module string) ([]*errDecl, error) {
 		if err != nil {
 			return err
 		}
-		packageName := strings.ReplaceAll(subPath, "/", "_")
-		if decl, found := dedup[packageName]; found {
+		importPath := module
+		if subPath != "." {
+			importPath += "/" + filepath.ToSlash(subPath)
+		}
+		if err := validateImportPath(importPath); err != nil {
+			return fmt.Errorf("invalid package directory %q: %w", dirPath, err)
+		}
+		if decl, found := dedup[importPath]; found {
 			decl.ErrNames = append(decl.ErrNames, errNames...)
 		} else {
 			decl := &errDecl{
-				ImportPath:  filepath.Join(module, subPath),
-				PackageName: packageName,
+				ImportPath:  importPath,
+				PackageName: fmt.Sprintf("errpkg%d", len(dedup)),
 				ErrNames:    errNames,
 			}
-			dedup[packageName] = decl
+			dedup[importPath] = decl
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	if len(dedup) == 0 {
+		return nil, fmt.Errorf("no error declarations found; refusing to overwrite the output")
+	}
 
 	var errDecls []*errDecl
 	for _, decl := range dedup {
 		errDecls = append(errDecls, decl)
 	}
 
-	return errDecls, err
+	return errDecls, nil
+}
+
+func validateImportPath(importPath string) error {
+	if !importPathRegexp.MatchString(importPath) {
+		return fmt.Errorf("invalid import path %q", importPath)
+	}
+	return nil
 }
 
 func export(f *ast.File) []string {
