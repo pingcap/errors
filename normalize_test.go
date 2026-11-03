@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/require"
 )
@@ -310,18 +309,65 @@ func TestFastGenWithCauseRedaction(t *testing.T) {
 	}
 }
 
-func TestGenWithStackByArgsNoCloneByDefault(t *testing.T) {
-	errTest := Normalize("Incorrect time value: '%s'", RFCCodeText("Internal:Test"))
+func TestGeneratedErrorCopiesArgs(t *testing.T) {
+	previousMode := RedactLogEnabled.Load()
+	t.Cleanup(func() { RedactLogEnabled.Store(previousMode) })
+	const format = "value %s, public %s, count %04d"
+	prototype := Normalize(format, RFCCodeText("Internal:Test"), RedactArgs([]int{0}))
+	wrapped := prototype.Wrap(stderrors.New(format))
 
-	origin := []byte("120120519090607")
-	arg := *(*string)(unsafe.Pointer(&origin))
-	err := errTest.GenWithStackByArgs(arg)
+	constructors := []struct {
+		name string
+		gen  func(...any) error
+	}{
+		{"GenWithStack", func(args ...any) error { return prototype.GenWithStack(format, args...) }},
+		{"GenWithStackByArgs", prototype.GenWithStackByArgs},
+		{"FastGen", func(args ...any) error { return prototype.FastGen(format, args...) }},
+		{"FastGenByArgs", prototype.FastGenByArgs},
+		{"GenWithStackByCause", wrapped.GenWithStackByCause},
+		{"GenWithStackByCauseFallback", prototype.GenWithStackByCause},
+		{"FastGenWithCause", wrapped.FastGenWithCause},
+		{"FastGenWithCauseFallback", prototype.FastGenWithCause},
+	}
+	argTypes := []struct {
+		name string
+		arg  func([]byte) any
+	}{
+		{"string", func(b []byte) any { return string(b) }},
+		{"bytes", func(b []byte) any { return b }},
+		{"HackedStr", func(b []byte) any { return hackedStringArg{raw: b} }},
+	}
+	for _, constructor := range constructors {
+		t.Run(constructor.name, func(t *testing.T) {
+			for _, tc := range []struct {
+				mode string
+				want string
+			}{
+				{RedactLogDisable, "value secret‹›, public visible, count 0042"},
+				{RedactLogEnable, "value ?, public visible, count 0042"},
+				{RedactLogMarker, "value ‹secret‹‹›››, public visible, count 0042"},
+			} {
+				t.Run(tc.mode, func(t *testing.T) {
+					RedactLogEnabled.Store(tc.mode)
+					for _, argType := range argTypes {
+						t.Run(argType.name, func(t *testing.T) {
+							secret := []byte("secret‹›")
+							public := []byte("visible")
+							args := []any{argType.arg(secret), argType.arg(public), 42}
+							original := append([]any(nil), args...)
+							err := constructor.gen(args...)
+							require.Equal(t, original, args, "construction must not modify the caller's slice")
+							got := err.(*withStack).error.(*Error)
 
-	copy(origin, "1 1:1:1.0000027")
-	got := err.(*withStack).error.(*Error).GetMsg()
-	want := "Incorrect time value: '1 1:1:1.0000027'"
-	if got != want {
-		t.Fatalf("message should track source bytes by default, got %q, want %q", got, want)
+							copy(args, []any{"raw secret", "raw public", 99})
+							require.Equal(t, tc.want, got.GetMsg(), "slice reuse must not undo redaction or change arguments")
+							require.Contains(t, err.Error(), "[Internal:Test]"+tc.want)
+							require.Contains(t, fmt.Sprintf("%+v", err), "[Internal:Test]"+tc.want)
+						})
+					}
+				})
+			}
+		})
 	}
 }
 
