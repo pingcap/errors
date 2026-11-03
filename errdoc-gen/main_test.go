@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	_ "github.com/pingcap/errors" // Load dependencies needed by the offline generated-program test.
 	"github.com/stretchr/testify/require"
 )
 
