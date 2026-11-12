@@ -21,7 +21,7 @@ jobs:
       - run: go test -cover -coverprofile=coverage.out ./...
       - name: Check coverage # TODO: increase minimum after adding more tests
         run: |
-          awk -v minimum=0 '
+          awk -v minimum=80 '
             NR > 1 {
               total += $2
               if ($3 > 0) covered += $2
