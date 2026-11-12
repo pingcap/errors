@@ -16,6 +16,7 @@ package errors
 import (
 	"fmt"
 	"runtime"
+	"slices"
 	"strconv"
 
 	"go.uber.org/atomic"
@@ -53,6 +54,15 @@ type HackedStr interface {
 }
 
 // Error is the 'prototype' of a type of errors.
+//
+// The Gen* and FastGen* methods copy the argument slice, but do not deep-copy its
+// values. Argument values and any data they reference must remain immutable for
+// the lifetime of the generated error, since message formatting is deferred.
+// This includes byte buffers, strings created with unsafe conversions, and the
+// state used by error, fmt.Stringer, and fmt.Formatter implementations. Callers
+// must copy mutable data before passing it as an argument, or use HackedStr for
+// ephemeral string sources.
+//
 // Use DefineError to make a *Error:
 // var ErrUnavailable = errors.Normalize("Region %d is unavailable", errors.RFCCodeText("Unavailable"))
 //
@@ -174,19 +184,12 @@ func (e *Error) GetMsg() string {
 }
 
 func freezeHackedStringArgs(args []any) []any {
-	// This helper intentionally mutates the input slice in place.
-	// It is only used inside error-construction paths where args are internal and should
-	// not be reused by callers after passing into Gen*/FastGen* APIs.
+	// Redaction and freezing must not modify the caller's backing array.
+	args = slices.Clone(args)
 	for i := range args {
-		hackedArg, ok := args[i].(HackedStr)
-		if !ok {
-			continue
+		if arg, ok := args[i].(HackedStr); ok {
+			args[i] = arg.FreezeStr()
 		}
-		// TiDB may pass unsafe zero-copy strings (for example from chunk buffers) as error args.
-		// Error message rendering is deferred until GetMsg/Error, so without freezing here we may
-		// observe later writes and print a different value than the one used when creating the error.
-		// Freezing in this central path keeps the copy cost only on error construction.
-		args[i] = hackedArg.FreezeStr()
 	}
 	return args
 }
