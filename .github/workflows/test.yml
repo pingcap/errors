@@ -1,0 +1,37 @@
+name: Go tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go vet ./...
+      - run: go test -cover -coverprofile=coverage.out ./...
+      - name: Check coverage # TODO: increase minimum after adding more tests
+        run: |
+          awk -v minimum=0 '
+            NR > 1 {
+              total += $2
+              if ($3 > 0) covered += $2
+            }
+            END {
+              if (total == 0) {
+                print "No statement coverage data"
+                exit 1
+              }
+              printf "Total statement coverage: %.2f%% (minimum: %d%%)\n", 100 * covered / total, minimum
+              exit (100 * covered < minimum * total)
+            }
+          ' coverage.out
