@@ -68,7 +68,7 @@ func TestFrameFormat(t *testing.T) {
 		Frame(initpc),
 		"%+s",
 		"github.com/pingcap/errors.init\n" +
-			"\t.+/pingcap/errors/stack_test.go",
+			"\t.+/stack_test.go",
 	}, {
 		Frame(0),
 		"%s",
@@ -115,7 +115,7 @@ func TestFrameFormat(t *testing.T) {
 		Frame(initpc),
 		"%+v",
 		"github.com/pingcap/errors.init\n" +
-			"\t.+/pingcap/errors/stack_test.go:11",
+			"\t.+/stack_test.go:11",
 	}, {
 		Frame(0),
 		"%v",
@@ -155,24 +155,24 @@ func TestStackTrace(t *testing.T) {
 	}{{
 		New("ooh"), []string{
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/pingcap/errors/stack_test.go",
+				"\t.+/stack_test.go",
 		},
 	}, {
 		Annotate(New("ooh"), "ahh"), []string{
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/pingcap/errors/stack_test.go", // this is the stack of Wrap, not New
+				"\t.+/stack_test.go", // this is the stack of Wrap, not New
 		},
 	}, {
 		Cause(Annotate(New("ooh"), "ahh")), []string{
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/pingcap/errors/stack_test.go", // this is the stack of New
+				"\t.+/stack_test.go", // this is the stack of New
 		},
 	}, {
 		func() error { return New("ooh") }(), []string{
 			`github.com/pingcap/errors.(func·009|TestStackTrace.func1)` +
-				"\n\t.+/pingcap/errors/stack_test.go", // this is the stack of New
+				"\n\t.+/stack_test.go", // this is the stack of New
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/pingcap/errors/stack_test.go", // this is the stack of New's caller
+				"\t.+/stack_test.go", // this is the stack of New's caller
 		},
 	}, {
 		Cause(func() error {
@@ -183,11 +183,11 @@ func TestStackTrace(t *testing.T) {
 			// go 1.23 when Debug its suffix is "TestStackTrace.func2.1", it's
 			// "TestStackTrace.TestStackTrace.func2.func3" when Run
 			`github.com/pingcap/errors.(func·010|TestStackTrace.func2.1|TestStackTrace.TestStackTrace.func2.func3)` +
-				"\n\t.+/pingcap/errors/stack_test.go", // this is the stack of Errorf
+				"\n\t.+/stack_test.go", // this is the stack of Errorf
 			`github.com/pingcap/errors.(func·011|TestStackTrace.func2)` +
-				"\n\t.+/pingcap/errors/stack_test.go", // this is the stack of Errorf's caller
+				"\n\t.+/stack_test.go", // this is the stack of Errorf's caller
 			"github.com/pingcap/errors.TestStackTrace\n" +
-				"\t.+/pingcap/errors/stack_test.go", // this is the stack of Errorf's caller's caller
+				"\t.+/stack_test.go", // this is the stack of Errorf's caller's caller
 		},
 	}}
 	for i, tt := range tests {
@@ -266,9 +266,9 @@ func TestStackTraceFormat(t *testing.T) {
 		"%+v",
 		"\n" +
 			"github.com/pingcap/errors.stackTrace\n" +
-			"\t.+/pingcap/errors/stack_test.go:\\d+\n" +
+			"\t.+/stack_test.go:\\d+\n" +
 			"github.com/pingcap/errors.TestStackTraceFormat\n" +
-			"\t.+/pingcap/errors/stack_test.go:\\d+",
+			"\t.+/stack_test.go:\\d+",
 	}, {
 		stackTrace()[:2],
 		"%#v",
