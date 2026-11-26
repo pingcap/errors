@@ -84,7 +84,7 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 // and the original global registry is removed.
 // This function is reserved for compatibility.
 func (e *Error) UnmarshalJSON(data []byte) error {
-	tErr := &jsonError{}
+	var tErr jsonError
 	if err := json.Unmarshal(data, &tErr); err != nil {
 		return Trace(err)
 	}

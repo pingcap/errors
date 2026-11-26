@@ -33,6 +33,12 @@ func TestUnmarshalJSONClearsLocalState(t *testing.T) {
 	require.Equal(t, message, decoded.Msg)
 }
 
+func TestUnmarshalJSONNullClearsError(t *testing.T) {
+	e := Error{code: 123, codeText: "executor:123", message: "old message"}
+	require.NoError(t, json.Unmarshal([]byte(`null`), &e))
+	require.Equal(t, Error{}, e)
+}
+
 func TestUnmarshalJSONInvalidInputPreservesError(t *testing.T) {
 	for _, input := range []string{
 		`{"message":"new message",`,
